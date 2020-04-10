@@ -1,7 +1,26 @@
 from typing import Any, Tuple, List
+import numpy as np
 import pickle
 import importlib
 
+def check_header(header):
+    header = list(map(str.upper,header))
+    header = np.array(header).squeeze()
+    if header.ndim != 1:
+        raise ValueError("Multi-dimensional header not allowed")
+    if np.any((header[:,None] == np.unique(header)).sum(0) != 1):
+        raise ValueError("Header with repeated entries not allowed")
+
+def channel2index(channel: str, header=['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']) -> int:
+    if not isinstance(channel, str):
+        raise ValueError("Channel '{}' type must be string. Provided type: {}.".format(channel,type(channel)))
+    check_header(header)
+    header = list(map(str.upper,header))
+    location = np.where(np.array(header) == channel.upper())[0]
+    if len(location) == 0:
+        raise ValueError("Channel '{}' not found in header with channels {}".format(channel, header))
+    return np.where(np.array(header) == channel.upper())[0][0]
+    
 def get_tqdm(iterator: Any, type: str = 'tqdm', **kwargs) -> Any:
     try:
         iterator_class = class_selector('tqdm', type)(iterator, **kwargs)

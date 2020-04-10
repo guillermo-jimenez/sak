@@ -1,3 +1,4 @@
+from .__ops import channel2index
 from .__ops import class_selector
 from .__ops import pickleload
 from .__ops import pickledump
