@@ -2,6 +2,13 @@ from typing import List
 from typing import Tuple
 import numpy as np
 
+def flatten_along_axis(X: np.ndarray, axis: int = None):
+    if axis != None:
+        X = X.reshape((X.shape[axis], np.prod(np.delete(X.shape,axis))))
+    else:
+        X = X.flatten()[np.newaxis,:]
+    return X
+
 def on_off_correction(X: np.ndarray) -> np.ndarray:
     X = np.copy(X)
     
@@ -16,53 +23,55 @@ def on_off_correction(X: np.ndarray) -> np.ndarray:
         
     return X.squeeze()
     
-def abs_max_is_positive(X: np.ndarray) -> List[np.ndarray]:
-    X = ordering_N_lead(X)
-    return (X[np.abs(X).argmax(axis=0),np.arange(X.shape[1])] == X[X.argmax(axis=0),np.arange(X.shape[1])]).tolist()
+def abs_max_is_positive(X: np.ndarray, axis: int = None) -> np.ndarray:
+    X = flatten_along_axis(X, axis)
+    return X[np.arange(X.shape[0]),np.abs(X).argmax(axis=-1)] == X[np.arange(X.shape[0]),X.argmax(axis=-1)].squeeze()
 
-def signed_maxima(X: np.ndarray) -> List[np.ndarray]:
-    X = ordering_N_lead(X)
-    return X[np.abs(X).argmax(axis=0),np.arange(X.shape[1])].tolist()
+def signed_maxima(X: np.ndarray, axis: int = None) -> np.ndarray:
+    X = flatten_along_axis(X, axis)
+    return X[np.arange(X.shape[0]),np.abs(X).argmax(axis=-1)].squeeze()
 
 def is_max(X: np.ndarray, sample: int) -> bool:
-    """Returns boolean true if sample is maxima of tensor"""
+    """Returns boolean true if sample is maxima of array"""
     return np.diff(np.sign(np.diff(X)),prepend=0,append=0).T[sample] < -1
 
 def is_min(X: np.ndarray, sample: int) -> bool:
-    """Returns boolean true if sample is minima of tensor"""
+    """Returns boolean true if sample is minima of array"""
     return np.diff(np.sign(np.diff(X)),prepend=0,append=0).T[sample] > 1
 
 def maxima(X: np.ndarray, sampfrom: int = 0, sampto: int = None) -> List[np.ndarray]:
-    """Returns relative maxima of tensor"""
-    X = ordering_N_lead(X)
+    """Returns relative maxima of array"""
+    # X = ordering_N_lead(X)
     X = X[sampfrom:sampto,]
     return [sampfrom + np.where(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T < -1)[0] for j in range(X.shape[1])]
 
 def minima(X: np.ndarray, sampfrom: int = 0, sampto: int = None) -> List[np.ndarray]:
-    """Returns relative minima of tensor"""
-    X = ordering_N_lead(X)
+    """Returns relative minima of array"""
+    # X = ordering_N_lead(X)
     X = X[sampfrom:sampto,]
     return [sampfrom + np.where(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T > 1)[0] for j in range(X.shape[1])]
 
 def extrema(X: np.ndarray, sampfrom: int = 0, sampto: int = None) -> List[np.ndarray]:
-    """Returns relative minima of tensor"""
-    X = ordering_N_lead(X)
+    """Returns relative minima of array"""
+    # X = ordering_N_lead(X)
     X = X[sampfrom:sampto,]
     return [sampfrom + np.where(np.abs(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T) > 1)[0] for j in range(X.shape[1])]
 
-def zero_crossings(X: np.ndarray) -> List[np.ndarray]:
-    """Returns zero crossings of tensor"""
-    X = ordering_N_lead(X)
+def zero_crossings(X: np.ndarray, axis: int = None) -> List[np.ndarray]:
+    """Returns zero crossings of array"""
+    if X.ndim == 1:
+        X = X[:,None]
+    # X = ordering_N_lead(X)
     return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])))[0] for j in range(X.shape[1])]
 
 def positive_zero_crossings(X: np.ndarray) -> List[np.ndarray]:
-    """Returns zero crossings of tensor"""
-    X = ordering_N_lead(X)
+    """Returns zero crossings of array"""
+    # X = ordering_N_lead(X)
     return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])) < 0)[0] for j in range(X.shape[1])]
 
 def negative_zero_crossings(X: np.ndarray) -> List[np.ndarray]:
-    """Returns zero crossings of tensor"""
-    X = ordering_N_lead(X)
+    """Returns zero crossings of array"""
+    # X = ordering_N_lead(X)
     return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])) > 0)[0] for j in range(X.shape[1])]
 
 def xcorr(x: np.ndarray, y: np.ndarray, normed: bool = True, maxlags: int = None) -> List[np.ndarray]:
@@ -74,8 +83,6 @@ def xcorr(x: np.ndarray, y: np.ndarray, normed: bool = True, maxlags: int = None
 
     # Order dimensions of both vectors
     if (x.ndim == 2) or (y.ndim == 2):
-        x =  ordering_N_lead(x)
-        y =  ordering_N_lead(y)
         return [__xcorr_aux(x[:,j],y[:,j],normed,maxlags) for j in range(x.shape[1])]
     else:
         x = x.squeeze()
