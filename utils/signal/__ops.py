@@ -50,23 +50,6 @@ def extrema(X: np.ndarray, sampfrom: int = 0, sampto: int = None) -> List[np.nda
     X = X[sampfrom:sampto,]
     return [sampfrom + np.where(np.abs(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T) > 1)[0] for j in range(X.shape[1])]
 
-def ordering_N_lead(X: np.ndarray) -> np.ndarray:
-    """Returns tensor ordering in shape (Samples, N), with N < Samples"""
-    # Squeeze any empty dimensions of the tensor
-    X = X.squeeze()
-
-    if X.ndim == 1: # Don't do anything, return X
-        X = X[:,np.newaxis]
-    elif X.ndim == 2:
-        if X.shape[0] < X.shape[1]:
-            X = X.T # Swap axes
-        else:
-            pass    # Don't do anything, return X
-    else:
-        raise ValueError("Function not defined for 3 or higher dimensional tensors")
-
-    return X
-
 def zero_crossings(X: np.ndarray) -> List[np.ndarray]:
     """Returns zero crossings of tensor"""
     X = ordering_N_lead(X)
