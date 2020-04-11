@@ -15,12 +15,12 @@ def mixup(x1: np.ndarray, x2: np.ndarray, alpha: float = 1.0, beta: float = 1.0,
         shuffle = False # The default indicates that no batch is used
 
     # Swap axes to generalize for n-dimensional tensor
-    x1 = np.swapaxes(x1,axis,0)
-    x2 = np.swapaxes(x2,axis,0)
+    x1 = np.swapaxes(x1,axis,0) # Compatible with pytorch
+    x2 = np.swapaxes(x2,axis,0) # Compatible with pytorch
 
     # Permutation along data axis (allowing batch mixup)
     if shuffle:
-        index = np.random.permutation(np.arange(x2.shape[0]))
+        index = np.random.permutation(np.arange(x2.shape[0])) # Compatible with pytorch
 
         # Mix datapoints. If shapes are incompatible, your loss
         xhat = lmbda * x1 + (1 - lmbda) * x2[index, :]
@@ -29,7 +29,7 @@ def mixup(x1: np.ndarray, x2: np.ndarray, alpha: float = 1.0, beta: float = 1.0,
         xhat = lmbda * x1 + (1 - lmbda) * x2
     
     # Swap axes back
-    xhat = np.swapaxes(xhat,axis,0)
+    xhat = np.swapaxes(xhat,axis,0) # Compatible with pytorch
 
     # Return mixed point and lambda. Left label computation to be project-specific
     return xhat, lmbda
