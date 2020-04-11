@@ -12,6 +12,7 @@ def mixup(x1: np.ndarray, x2: np.ndarray, alpha: float = 1.0, beta: float = 1.0,
 
     if axis is None:
         axis = 0
+        shuffle = False # The default indicates that no batch is used
 
     # Swap axes to generalize for n-dimensional tensor
     x1 = np.swapaxes(x1,axis,0)
