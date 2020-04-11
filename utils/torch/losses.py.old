@@ -1,0 +1,85 @@
+import torch
+
+# https://github.com/LIVIAETS/surface-loss/blob/master/losses.py
+class ModifiedSurfaceLoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, s, g):
+        loss = (s-g).abs().mean()
+        return loss
+
+
+class BoundaryLoss(torch.nn.Module):
+    def __init__(self, kernel_size=25):
+        super().__init__()
+    
+    def forward(self, s, g, kernel_size=25):
+        sminusg = (s-g).abs()
+        splusg  = (s+g).clamp(max=1.)
+
+        num = sminusg.sum(-1)
+        den = splusg.sum(-1)
+        divided = (num + 1.)/ (den + 1. + 1e-10)
+        loss = divided.mean()
+
+        return loss
+
+
+# https://github.com/LIVIAETS/surface-loss/blob/master/losses.py
+class DiceLoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+        
+    def forward(self, s, g):
+        intersection = (g*s).sum(-1)
+        union = (g + s).sum(-1)
+        divided = 1 - (2 * intersection + 1. + 1e-10) / (union + 1. + 1e-10)
+        loss = divided.mean()
+
+        return loss
+
+
+# https://github.com/LIVIAETS/surface-loss/blob/master/losses.py
+class DiscrepanceLoss(torch.nn.Module):
+    def __init__(self):
+        super().__init__()
+    def forward(self, s, g):
+        loss = (s-g).abs().sum()
+        return loss
+
+
+class BoundDiceLoss(torch.nn.Module):
+    def __init__(self, device='cuda', kernel_size=25):
+        super().__init__()
+        self.filt = torch.zeros(3,3,kernel_size).to(device)
+        self.filt[0,0,0] = -1.
+        self.filt[1,1,0] = -1.
+        self.filt[2,2,0] = -1.
+        self.filt[0,0,-1] = 1.
+        self.filt[1,1,-1] = 1.
+        self.filt[2,2,-1] = 1.
+
+        self.padding = (kernel_size-1)//2
+    
+    def forward(self, s, g, kernel_size=25):
+        maskg = torch.conv1d(g, self.filt, padding=self.padding).round().abs()
+        masks = torch.conv1d(s, self.filt, padding=self.padding).round().abs()
+
+        maskg_minus_masks = (masks-maskg).abs()
+        maskg_plus_masks =  (masks+maskg).clamp(max=1)
+
+        loss = ((maskg_minus_masks.sum([-1,-2]) + 1. + 1e-10)/(maskg_plus_masks.sum([-1,-2]) + 1. + 1e-10)).mean()
+
+        return loss
+
+
+# https://github.com/LIVIAETS/surface-loss/blob/master/losses.py
+# class SurfaceLoss(torch.nn.Module):
+#     def __init__(self):
+#         super().__init__()
+#     def forward(self, s, dist_maps):
+#         loss = (s*dist_maps).mean()
+#         return loss
+
+

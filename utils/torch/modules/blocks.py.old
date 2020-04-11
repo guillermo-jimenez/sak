@@ -1,0 +1,311 @@
+import torch
+import torch.nn
+import utils
+import utils.modules
+from utils.__ops import required
+from utils.__ops import check_required
+
+"""
+Order of operations
+https://github.com/ducha-aiki/caffenet-benchmark/blob/master/batchnorm.md
+"""
+
+class Linear(torch.nn.Module):
+    def __init__(self, in_channels: int = required, 
+                       out_channels: int = required, 
+                       dropout_rate: float = 0.25, 
+                       activation: str = required, 
+                       **kwargs: dict):
+        super(Linear, self).__init__()
+
+        # Check inputs
+        in_dict = {
+            'in_channels'  : in_channels,
+            'out_channels' : out_channels,
+            'dropout_rate' : dropout_rate,
+            'activation'   : activation,
+        }
+        check_required(self, in_dict)
+        
+        # Store inputs
+        self.linear = torch.nn.Linear(in_channels, out_channels, **kwargs)
+        self.activation = utils.class_selector('utils.activations', activation)()
+        self.dropout = torch.nn.Dropout(dropout_rate)
+        
+    def forward(self, x: torch.Tensor):
+        h = self.linear(x)
+        h = self.activation(h)
+        h = self.dropout(h)
+        return h
+
+class Separable1d(torch.nn.Module):
+    def __init__(self, in_channels: int = required, 
+                       out_channels: int = required, 
+                       kernel_size: int = 3, 
+                       preactivation: bool = True, 
+                       dropout_rate: float = 0.25, 
+                       activation: str = required, 
+                       **kwargs: dict):
+        super(Separable1d, self).__init__()
+        
+        # Check inputs
+        in_dict = {
+            'in_channels'  : in_channels,
+            'out_channels' : out_channels,
+            'activation'   : activation,
+        }
+        check_required(self, in_dict)
+
+        # Pre-activation
+        self.preactivation = preactivation
+        if self.preactivation:
+            self.activation = utils.class_selector('utils.activations', activation)() 
+            self.normalization = torch.nn.BatchNorm1d(in_channels)
+            self.dropout = utils.modules.SpatialDropout1d(dropout_rate)
+        self.separable_conv = utils.modules.SeparableConv1d(in_channels, out_channels, kernel_size, **kwargs)
+        
+    def forward(self, x: torch.Tensor):
+        h = x
+        if self.preactivation:
+            h = self.activation(h)
+            h = self.normalization(h)
+            h = self.dropout(h)
+        h = self.separable_conv(h)
+        return h
+
+class PointWise1d(torch.nn.Module):
+    def __init__(self, in_channels: int = required, 
+                       out_channels: int = required, 
+                       preactivation: bool = True, 
+                       dropout_rate: float = 0.25, 
+                       activation: str = required, 
+                       **kwargs: dict):
+        super(PointWise1d, self).__init__()
+        
+        # Check inputs
+        in_dict = {
+            'in_channels'  : in_channels,
+            'out_channels' : out_channels,
+            'activation'   : activation,
+        }
+        check_required(self, in_dict)
+
+        # Pre-activation
+        self.preactivation = preactivation
+        if self.preactivation:
+            self.activation = utils.class_selector('utils.activations', activation)() 
+            self.normalization = torch.nn.BatchNorm1d(in_channels)
+            self.dropout = utils.modules.SpatialDropout1d(dropout_rate)
+        self.pointwise_conv = utils.modules.PointWiseConv1d(in_channels, out_channels, **kwargs)
+        
+    def forward(self, x: torch.Tensor):
+        h = x
+        if self.preactivation:
+            h = self.activation(h)
+            h = self.normalization(h)
+            h = self.dropout(h)
+        h = self.pointwise_conv(h)
+        return h
+
+class DepthWise1d(torch.nn.Module):
+    def __init__(self, in_channels: int = required, 
+                       kernel_size: int = 3, 
+                       preactivation: bool = True, 
+                       dropout_rate: float = 0.25, 
+                       activation: str = required, 
+                       **kwargs: dict):
+        super(DepthWise1d, self).__init__()
+        
+        # Check inputs
+        in_dict = {
+            'in_channels'  : in_channels,
+            'activation'   : activation,
+        }
+        check_required(self, in_dict)
+
+        # Pre-activation
+        self.preactivation = preactivation
+        if self.preactivation:
+            self.activation = utils.class_selector('utils.activations', activation)() 
+            self.normalization = torch.nn.BatchNorm1d(in_channels)
+            self.dropout = utils.modules.SpatialDropout1d(dropout_rate)
+        self.depthwise_conv = utils.modules.DepthwiseConv1d(in_channels, kernel_size, **kwargs)
+        
+    def forward(self, x: torch.Tensor):
+        h = x
+        if self.preactivation:
+            h = self.activation(h)
+            h = self.normalization(h)
+            h = self.dropout(h)
+        h = self.depthwise_conv(h)
+        return h
+
+class ResidualSeparable1d(torch.nn.Module):
+    def __init__(self, in_channels: int = required, 
+                       out_channels: int = required, 
+                       kernel_size: int = 3, 
+                       preactivation: bool = True, 
+                       dropout_rate: float = 0.25, 
+                       activation: str = required, 
+                       **kwargs: dict):
+        super(ResidualSeparable1d, self).__init__()
+        
+        # Check inputs
+        in_dict = {
+            'in_channels'  : in_channels,
+            'out_channels' : out_channels,
+            'activation'   : activation,
+        }
+        check_required(self, in_dict)
+        
+        # Pre-activation
+        self.separable_conv1 = Separable1d(in_channels, out_channels, kernel_size, preactivation, dropout_rate, **kwargs)
+        self.separable_conv2 = Separable1d(out_channels, out_channels, kernel_size, preactivation, dropout_rate, **kwargs)
+        self.pointwise_conv = PointWise1d(in_channels, out_channels, preactivation, dropout_rate, **kwargs)
+
+    def forward(self, x: torch.Tensor):
+        h = self.separable_conv1(x)
+        h = self.separable_conv2(h)
+        
+        # If the number of channels of x and h does not coincide,
+        # apply same transformation to x
+        if x.shape[1] != h.shape[1]:
+            x = self.pointwise_conv(x)
+
+        return x + h # Residual connection
+
+class SeparableTranspose1d(torch.nn.Module):
+    def __init__(self, in_channels: int = required, 
+                       out_channels: int = required, 
+                       kernel_size: int = 3, 
+                       preactivation: bool = True, 
+                       dropout_rate: float = 0.25, 
+                       activation: str = required, 
+                       **kwargs: dict):
+        super(SeparableTranspose1d, self).__init__()
+        
+        # Check inputs
+        in_dict = {
+            'in_channels'  : in_channels,
+            'out_channels' : out_channels,
+            'activation'   : activation,
+        }
+        check_required(self, in_dict)
+
+        # Pre-activation
+        self.preactivation = preactivation
+        if self.preactivation:
+            self.activation = utils.class_selector('utils.activations', activation)() 
+            self.normalization = torch.nn.BatchNorm1d(in_channels)
+            self.dropout = utils.modules.SpatialDropout1d(dropout_rate)
+        self.separable_conv = utils.modules.SeparableConvTranspose1d(in_channels, out_channels, kernel_size, **kwargs)
+        
+    def forward(self, x: torch.Tensor):
+        h = x
+        if self.preactivation:
+            h = self.activation(h)
+            h = self.normalization(h)
+            h = self.dropout(h)
+        h = self.separable_conv(h)
+        return h
+
+class PointWiseTranspose1d(torch.nn.Module):
+    def __init__(self, in_channels: int = required, 
+                       out_channels: int = required, 
+                       preactivation: bool = True, 
+                       dropout_rate: float = 0.25, 
+                       activation: str = required, 
+                       **kwargs: dict):
+        super(PointWiseTranspose1d, self).__init__()
+        
+        # Check inputs
+        in_dict = {
+            'in_channels'  : in_channels,
+            'out_channels' : out_channels,
+            'activation'   : activation,
+        }
+        check_required(self, in_dict)
+
+        # Pre-activation
+        self.preactivation = preactivation
+        if self.preactivation:
+            self.activation = utils.class_selector('utils.activations', activation)() 
+            self.normalization = torch.nn.BatchNorm1d(in_channels)
+            self.dropout = utils.modules.SpatialDropout1d(dropout_rate)
+        self.pointwise_conv = utils.modules.PointWiseConvTranspose1d(in_channels, out_channels, **kwargs)
+        
+    def forward(self, x: torch.Tensor):
+        h = x
+        if self.preactivation:
+            h = self.activation(h)
+            h = self.normalization(h)
+            h = self.dropout(h)
+        h = self.pointwise_conv(h)
+        return h
+
+class DepthWiseTranspose1d(torch.nn.Module):
+    def __init__(self, in_channels: int = required, 
+                       kernel_size: int = 3, 
+                       preactivation: bool = True, 
+                       dropout_rate: float = 0.25, 
+                       activation: str = required, 
+                       **kwargs: dict):
+        super(DepthWiseTranspose1d, self).__init__()
+        
+        # Check inputs
+        in_dict = {
+            'in_channels'  : in_channels,
+            'activation'   : activation,
+        }
+        check_required(self, in_dict)
+
+        # Pre-activation
+        self.preactivation = preactivation
+        if self.preactivation:
+            self.activation = utils.class_selector('utils.activations', activation)() 
+            self.normalization = torch.nn.BatchNorm1d(in_channels)
+            self.dropout = utils.modules.SpatialDropout1d(dropout_rate)
+        self.depthwise_conv = utils.modules.DepthwiseConvTranspose1d(in_channels, kernel_size, **kwargs)
+        
+    def forward(self, x: torch.Tensor):
+        h = x
+        if self.preactivation:
+            h = self.activation(h)
+            h = self.normalization(h)
+            h = self.dropout(h)
+        h = self.depthwise_conv(h)
+        return h
+
+class ResidualSeparableTranspose1d(torch.nn.Module):
+    def __init__(self, in_channels: int = required, 
+                       out_channels: int = required, 
+                       kernel_size: int = 3, 
+                       preactivation: bool = True, 
+                       dropout_rate: float = 0.25, 
+                       activation: str = required, 
+                       **kwargs: dict):
+        super(ResidualSeparableTranspose1d, self).__init__()
+        
+        # Check inputs
+        in_dict = {
+            'in_channels'  : in_channels,
+            'out_channels' : out_channels,
+            'activation'   : activation,
+        }
+        check_required(self, in_dict)
+        
+        # Pre-activation
+        self.separable_conv1 = SeparableTranspose1d(in_channels, out_channels, kernel_size, preactivation, dropout_rate, **kwargs)
+        self.separable_conv2 = SeparableTranspose1d(out_channels, out_channels, kernel_size, preactivation, dropout_rate, **kwargs)
+        self.pointwise_conv = PointWiseTranspose1d(in_channels, out_channels, preactivation, dropout_rate, **kwargs)
+
+    def forward(self, x: torch.Tensor):
+        h = self.separable_conv1(x)
+        h = self.separable_conv2(h)
+        
+        # If the number of channels of x and h does not coincide,
+        # apply same transformation to x
+        if x.shape[1] != h.shape[1]:
+            x = self.pointwise_conv(x)
+
+        return x + h # Residual connection
