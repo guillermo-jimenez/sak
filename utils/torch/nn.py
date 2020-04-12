@@ -1,7 +1,13 @@
+from collections import OrderedDict
+from typing import Any
+from typing import List
+from typing import Tuple
+from torch._jit_internal import _copy_to_script_wrapper
 import utils
-import utils.torch.modules
 from torch import Tensor
 from torch import Size
+from torch import exp
+from torch import randn_like
 from torch.nn import Module
 from torch.nn import BatchNorm1d
 from torch.nn import BatchNorm2d
@@ -95,6 +101,324 @@ from utils.__ops import check_required
 Order of operations
 https://github.com/ducha-aiki/caffenet-benchmark/blob/master/batchnorm.md
 """
+
+def update_regularization(regularization_list: list = required, network_params: dict = required, preoperation=False):
+    """Convenience function to update the values of different regularization strategies"""
+    # Iterate over parameters list to check if update is needed
+    for i in range(len(regularization_list)):
+        # Iterate over contained parameters (exclude default)
+        for arg in regularization_list[i].get('arguments',{}):
+            # Case batchnorm
+            if arg == 'num_features':
+                # Check the model's operation parameters
+                for p in network_params:
+                    # If 
+                    if preoperation and (p in ['in_channels', 'in_features', 'input_size', 'd_model']):
+                        regularization_list[i]['arguments'][arg] = network_params[p]
+                    elif not preoperation and (p in ['out_channels', 'out_features', 'hidden_size', 'd_model']):
+                        regularization_list[i]['arguments'][arg] = network_params[p]
+
+            # Keep adding
+            pass
+    return regularization_list
+        
+    
+class Sequential(Module):
+    r"""Another sequential container.
+    Modules will be added to it in the order they are passed in the constructor.
+    Alternatively, an ordered dict of modules can also be passed in.
+
+    To make it easier to understand, here is a small example::
+
+        # Example of using Sequential
+        model = nn.Sequential(
+                  nn.Conv2d(1,20,5),
+                  nn.ReLU(),
+                  nn.Conv2d(20,64,5),
+                  nn.ReLU()
+                )
+
+        # Example of using Sequential with OrderedDict
+        model = nn.Sequential(OrderedDict([
+                  ('conv1', nn.Conv2d(1,20,5)),
+                  ('relu1', nn.ReLU()),
+                  ('conv2', nn.Conv2d(20,64,5)),
+                  ('relu2', nn.ReLU())
+                ]))
+    """
+
+    def __init__(self, *args):
+        super(Sequential, self).__init__()
+        if len(args) == 1 and isinstance(args[0], OrderedDict):
+            for key, module in args[0].items():
+                self.add_module(key, module)
+        else:
+            for idx, module in enumerate(args):
+                self.add_module(str(idx), module)
+
+    def _get_item_by_idx(self, iterator, idx):
+        """Get the idx-th item of the iterator"""
+        size = len(self)
+        idx = operator.index(idx)
+        if not -size <= idx < size:
+            raise IndexError('index {} is out of range'.format(idx))
+        idx %= size
+        return next(islice(iterator, idx, None))
+
+    @_copy_to_script_wrapper
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            return self.__class__(OrderedDict(list(self._modules.items())[idx]))
+        else:
+            return self._get_item_by_idx(self._modules.values(), idx)
+
+    def __setitem__(self, idx, module):
+        key = self._get_item_by_idx(self._modules.keys(), idx)
+        return setattr(self, key, module)
+
+    def __delitem__(self, idx):
+        if isinstance(idx, slice):
+            for key in list(self._modules.keys())[idx]:
+                delattr(self, key)
+        else:
+            key = self._get_item_by_idx(self._modules.keys(), idx)
+            delattr(self, key)
+
+    @_copy_to_script_wrapper
+    def __len__(self):
+        return len(self._modules)
+
+    @_copy_to_script_wrapper
+    def __dir__(self):
+        keys = super(Parallel, self).__dir__()
+        keys = [key for key in keys if not key.isdigit()]
+        return keys
+
+    @_copy_to_script_wrapper
+    def __iter__(self):
+        return iter(self._modules.values())
+
+    def forward(self, input):
+        for module in self:
+            if isinstance(input, tuple):
+                input = module(*input)
+            else:
+                input = module(input)
+        return input
+
+
+class Parallel(Module):
+    r"""A parallel container.
+    Modules will be added to it in the order they are passed in the constructor.
+    Alternatively, an ordered dict of modules can also be passed in.
+
+    To make it easier to understand, here is a small example::
+
+        # Example of using Parallel
+        model = nn.Parallel(
+                  nn.Conv2d(1,20,5),
+                  nn.ReLU(),
+                  nn.Conv2d(20,64,5),
+                  nn.ReLU()
+                )
+
+        # Example of using Parallel with OrderedDict
+        model = nn.Parallel(OrderedDict([
+                  ('conv1', nn.Conv2d(1,20,5)),
+                  ('relu1', nn.ReLU()),
+                  ('conv2', nn.Conv2d(20,64,5)),
+                  ('relu2', nn.ReLU())
+                ]))
+    """
+
+    def __init__(self, *args):
+        super(Parallel, self).__init__()
+        if len(args) == 1 and isinstance(args[0], OrderedDict):
+            for key, module in args[0].items():
+                self.add_module(key, module)
+        else:
+            for idx, module in enumerate(args):
+                self.add_module(str(idx), module)
+
+    def _get_item_by_idx(self, iterator, idx):
+        """Get the idx-th item of the iterator"""
+        size = len(self)
+        idx = operator.index(idx)
+        if not -size <= idx < size:
+            raise IndexError('index {} is out of range'.format(idx))
+        idx %= size
+        return next(islice(iterator, idx, None))
+
+    @_copy_to_script_wrapper
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            return self.__class__(OrderedDict(list(self._modules.items())[idx]))
+        else:
+            return self._get_item_by_idx(self._modules.values(), idx)
+
+    def __setitem__(self, idx, module):
+        key = self._get_item_by_idx(self._modules.keys(), idx)
+        return setattr(self, key, module)
+
+    def __delitem__(self, idx):
+        if isinstance(idx, slice):
+            for key in list(self._modules.keys())[idx]:
+                delattr(self, key)
+        else:
+            key = self._get_item_by_idx(self._modules.keys(), idx)
+            delattr(self, key)
+
+    @_copy_to_script_wrapper
+    def __len__(self):
+        return len(self._modules)
+
+    @_copy_to_script_wrapper
+    def __dir__(self):
+        keys = super(Parallel, self).__dir__()
+        keys = [key for key in keys if not key.isdigit()]
+        return keys
+
+    @_copy_to_script_wrapper
+    def __iter__(self):
+        return iter(self._modules.values())
+
+    def forward(self, input):
+        output = []
+        for module in self:
+            output.append(module(input))
+        return tuple(output)
+
+
+class CNN(Module):
+    def __init__(self, 
+                 channels: List[int] = required,
+                 operation: dict = {"name" : "Conv1d"},
+                 regularization: list = None,
+                 regularize_extrema: bool = True,
+                 preoperation: bool = False,
+                 **kwargs):
+        super(CNN, self).__init__()
+        
+        # Store inputs
+        self.channels = channels
+        self.operation = utils.class_selector('utils.torch.nn',operation['name'])
+        self.operation_params = operation.get('arguments',{"kernel_size" : 3, "padding" : 1})
+        self.regularization = regularization
+        self.regularize_extrema = regularize_extrema
+        self.preoperation = preoperation
+        
+        # Create operations
+        self.operations = []
+        for i in range(len(channels)-1):
+            # Update parameters
+            self.operation_params['in_channels'] = channels[i]
+            self.operation_params['out_channels'] = channels[i+1]
+            
+            # Update regularization parameters
+            self.regularization = update_regularization(
+                self.regularization,
+                self.operation_params, 
+                preoperation=self.preoperation)
+            
+            # If not preoperation, operation before regularization
+            if self.preoperation:
+                # Regularization
+                if self.regularize_extrema or (not self.regularize_extrema and i != 0):
+                    self.operations.append(Regularization(self.regularization))
+                    
+                # Operation
+                self.operations.append(self.operation(**self.operation_params))
+            else:
+                # Operation
+                self.operations.append(self.operation(**self.operation_params))
+                
+                # Regularization
+                if self.regularize_extrema or (not self.regularize_extrema and i != len(channels)-2):
+                    self.operations.append(Regularization(self.regularization))
+                    
+            
+        # Create sequential model
+        self.operations = Sequential(*self.operations)
+    
+    def forward(self, x: Tensor) -> Any:
+        return self.operations(x)
+
+
+class DNN(Module):
+    def __init__(self, 
+                 features: List[int] = required,
+                 operation: dict = {"name" : "Linear"},
+                 regularization: list = None,
+                 regularize_extrema: bool = True,
+                 preoperation: bool = False,
+                 **kwargs):
+        super(DNN, self).__init__()
+        
+        # Store inputs
+        self.features = features
+        self.operation = utils.class_selector('utils.torch.nn',operation['name'])
+        self.operation_params = operation.get('arguments',{})
+        self.regularization = regularization
+        self.regularize_extrema = regularize_extrema
+        self.preoperation = preoperation
+        
+        # Create operations
+        self.operations = []
+        for i in range(len(features)-1):
+            # Update parameters
+            self.operation_params['in_features'] = features[i]
+            self.operation_params['out_features'] = features[i+1]
+            
+            # Update regularization parameters
+            self.regularization = update_regularization(
+                self.regularization,
+                self.operation_params, 
+                preoperation=self.preoperation)
+            
+            # If not preoperation, operation before regularization
+            if self.preoperation:
+                # Regularization
+                if self.regularize_extrema or (not self.regularize_extrema and i != 0):
+                    self.operations.append(Regularization(self.regularization))
+                    
+                # Operation
+                self.operations.append(self.operation(**self.operation_params))
+            else:
+                # Operation
+                self.operations.append(self.operation(**self.operation_params))
+                
+                # Regularization
+                if self.regularize_extrema or (not self.regularize_extrema and i != len(features)-2):
+                    self.operations.append(Regularization(self.regularization))
+                    
+            
+        # Create sequential model
+        self.operations = Sequential(*self.operations)
+    
+    def forward(self, x: Tensor) -> Any:
+        return self.operations(x)
+
+
+class Regularization(Module):
+    def __init__(self, operations: list):
+        super(Regularization, self).__init__()
+        self.operations = []
+        for i in range(len(operations)):
+            self.operations.append(utils.class_selector('utils.torch.nn',operations[i]['name'])(**operations[i].get('arguments',{})))
+        self.operations = Sequential(*self.operations)
+    
+    def forward(self, x: Tensor) -> Tensor:
+        return self.operations(x)
+        
+class Reparameterize(Module):
+    def __init__(self, *args, **kwargs):
+        super(Reparameterize, self).__init__()
+        pass
+    
+    def forward(self, mu: Tensor, logvar: Tensor) -> Tensor:
+        std = exp(0.5*logvar)
+        eps = randn_like(std)
+        return mu + eps*std
 
 class none(Module):
     """Does nothing apply dropout"""
@@ -340,7 +664,7 @@ class Residual(Module):
 
         # Define operation to be performed
         self.repetitions = repetitions
-        self.operation = utils.class_selector('utils.torch.blocks', operation)
+        self.operation = utils.class_selector('utils.torch.nn', operation)
 
         # Check number of repetitions is higher than 1 (otherwise why bother?)
         if repetitions < 1:
@@ -358,7 +682,7 @@ class Residual(Module):
             in_channels = out_channels
 
         # Operations
-        self.operation_stack = torch.nn.Sequential(*self.operation_stack)
+        self.operation_stack = Sequential(*self.operation_stack)
 
         # Operation if # of channels changes
         if __in_channels != out_channels:
@@ -381,15 +705,16 @@ class Residual(Module):
 
 class Dropout1d(Module):
     """Applies one-dimensional spatial dropout"""
-    def __init__(self, p: float):
+    def __init__(self, p: [0., 1.]):
         super(Dropout1d, self).__init__()
-        assert (p >= 0) and (p <= 1)
+        if (p < 0) or (p > 1):
+            raise ValueError("Invalid probability {} provided. Must be formatted in range [0,1]".format(p))
         self.p = p
     
     def forward(self, x: Tensor) -> Tensor:
         # add a dimension for 2D to work -> format BxCxHxW
         x = x.unsqueeze(-1) 
-        x = torch.nn.Dropout2d(self.p)(x).squeeze(-1)
+        x = Dropout2d(self.p)(x).squeeze(-1)
         return x
 
 
