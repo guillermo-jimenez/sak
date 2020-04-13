@@ -55,6 +55,6 @@ class _RequiredParameter(object):
 def check_required(obj, dic: dict):
     for (param, value) in dic.items():
         if value is required:
-            raise ValueError("Class {} instantiated without initializing parameter '{}'".format(obj.__class__, param))
+            raise ValueError("Class {} instantiated without required parameter '{}'".format(obj.__class__, param))
 
 required = _RequiredParameter()
