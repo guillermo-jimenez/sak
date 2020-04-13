@@ -1,9 +1,11 @@
+import utils
+import operator
 from collections import OrderedDict
 from typing import Any
 from typing import List
 from typing import Tuple
 from torch._jit_internal import _copy_to_script_wrapper
-import utils
+from itertools import islice
 from torch import Tensor
 from torch import Size
 from torch import exp
@@ -169,6 +171,8 @@ class Sequential(Module):
     def __getitem__(self, idx):
         if isinstance(idx, slice):
             return self.__class__(OrderedDict(list(self._modules.items())[idx]))
+        elif isinstance(idx, str):
+            return self._modules[idx]
         else:
             return self._get_item_by_idx(self._modules.values(), idx)
 
@@ -253,6 +257,8 @@ class Parallel(Module):
     def __getitem__(self, idx):
         if isinstance(idx, slice):
             return self.__class__(OrderedDict(list(self._modules.items())[idx]))
+        elif isinstance(idx, str):
+            return self._modules[idx]
         else:
             return self._get_item_by_idx(self._modules.values(), idx)
 
