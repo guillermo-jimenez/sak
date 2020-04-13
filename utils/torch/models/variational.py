@@ -3,7 +3,7 @@ import inspect
 import torch
 import torch.nn
 import utils
-import utils.torch.blocks
+import utils.torch.nn
 # import utils.modules
 
 # Check required arguments as keywords
@@ -56,9 +56,9 @@ class CVAE1d(utils.torch.models.Variational):
         encoder_operations = []
         for i in range(len(self.encoder_channels)-1):
             if (i != 0):
-                encoder_operations.append(utils.class_selector('utils.torch.activation', 'ReLU')())
-                # encoder_operations.append(utils.class_selector('utils.torch.normalization', 'BatchNorm1d')(self.encoder_channels[i]))
-                encoder_operations.append(utils.class_selector('utils.torch.dropout', 'Dropout1d')(0.25))
+                encoder_operations.append(utils.class_selector('utils.torch.nn', 'ReLU')())
+                # encoder_operations.append(utils.class_selector('utils.torch.nn', 'BatchNorm1d')(self.encoder_channels[i]))
+                encoder_operations.append(utils.class_selector('utils.torch.nn', 'Dropout1d')(0.25))
 
             encoder_operations.append(
                 utils.class_selector('utils.torch.blocks', operation_encoder)(
@@ -72,8 +72,8 @@ class CVAE1d(utils.torch.models.Variational):
 
         # Encoder linear mapping operations
         for i in range(len(self.encoder_linear_neurons)-1):
-            encoder_operations.append(utils.class_selector('utils.torch.activation', 'ReLU')())
-            encoder_operations.append(utils.class_selector('utils.torch.dropout', 'Dropout')(0.25))
+            encoder_operations.append(utils.class_selector('utils.torch.nn', 'ReLU')())
+            encoder_operations.append(utils.class_selector('utils.torch.nn', 'Dropout')(0.25))
 
             encoder_operations.append(
                 utils.torch.blocks.Linear(
@@ -82,8 +82,8 @@ class CVAE1d(utils.torch.models.Variational):
                 )
             )
 
-        encoder_operations.append(utils.class_selector('utils.torch.activation', 'ReLU')())
-        encoder_operations.append(utils.class_selector('utils.torch.dropout', 'Dropout')(0.25))
+        encoder_operations.append(utils.class_selector('utils.torch.nn', 'ReLU')())
+        encoder_operations.append(utils.class_selector('utils.torch.nn', 'Dropout')(0.25))
 
         # To sequential
         self.encoder_operations = torch.nn.Sequential(*encoder_operations)
@@ -103,8 +103,8 @@ class CVAE1d(utils.torch.models.Variational):
         decoder_operations = []
         for i in range(len(self.decoder_linear_neurons)-1):
             if (i != 0):
-                decoder_operations.append(utils.class_selector('utils.torch.activation', 'ReLU')())
-                decoder_operations.append(utils.class_selector('utils.torch.dropout', 'Dropout')(0.25))
+                decoder_operations.append(utils.class_selector('utils.torch.nn', 'ReLU')())
+                decoder_operations.append(utils.class_selector('utils.torch.nn', 'Dropout')(0.25))
             
             decoder_operations.append(
                 utils.torch.blocks.Linear(
@@ -116,9 +116,9 @@ class CVAE1d(utils.torch.models.Variational):
         decoder_operations.append(utils.torch.blocks.UnFlatten([self.decoder_channels[0],input_shape]))
 
         for i in range(len(self.decoder_channels)-1):
-            decoder_operations.append(utils.class_selector('utils.torch.activation', 'ReLU')())
-            # decoder_operations.append(utils.class_selector('utils.torch.normalization', 'BatchNorm1d')(self.decoder_channels[i]))
-            decoder_operations.append(utils.class_selector('utils.torch.dropout', 'Dropout1d')(0.25))
+            decoder_operations.append(utils.class_selector('utils.torch.nn', 'ReLU')())
+            # decoder_operations.append(utils.class_selector('utils.torch.nn', 'BatchNorm1d')(self.decoder_channels[i]))
+            decoder_operations.append(utils.class_selector('utils.torch.nn', 'Dropout1d')(0.25))
 
             decoder_operations.append(
                 utils.class_selector('utils.torch.blocks', operation_decoder)(
