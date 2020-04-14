@@ -321,16 +321,18 @@ class CNN(Module):
             self.operation_params['out_channels'] = channels[i+1]
             
             # Update regularization parameters
-            self.regularization = update_regularization(
-                self.regularization,
-                self.operation_params, 
-                preoperation=self.preoperation)
+            if self.regularization:
+                self.regularization = update_regularization(
+                    self.regularization,
+                    self.operation_params, 
+                    preoperation=self.preoperation)
             
             # If not preoperation, operation before regularization
             if self.preoperation:
                 # Regularization
-                if self.regularize_extrema or (not self.regularize_extrema and i != 0):
-                    self.operations.append(Regularization(self.regularization))
+                if self.regularization:
+                    if self.regularize_extrema or (not self.regularize_extrema and i != 0):
+                        self.operations.append(Regularization(self.regularization))
                     
                 # Operation
                 self.operations.append(self.operation(**self.operation_params))
@@ -339,8 +341,9 @@ class CNN(Module):
                 self.operations.append(self.operation(**self.operation_params))
                 
                 # Regularization
-                if self.regularize_extrema or (not self.regularize_extrema and i != len(channels)-2):
-                    self.operations.append(Regularization(self.regularization))
+                if self.regularization:
+                    if self.regularize_extrema or (not self.regularize_extrema and i != len(channels)-2):
+                        self.operations.append(Regularization(self.regularization))
                     
             
         # Create sequential model
