@@ -489,6 +489,23 @@ class Add(Module):
         return x + y
 
 
+class Squeeze(Module):
+    def __init__(self, *args, **kwargs):
+        super(Squeeze, self).__init__()
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x.squeeze()
+
+
+class View(Module):
+    def __init__(self, *shape, **kwargs):
+        super(View, self).__init__()
+        self.shape = shape
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x.view(*self.shape)
+
+
 class UnFlatten(Module):
     def __init__(self, shape: Size or list or tuple):
         super(UnFlatten, self).__init__()
