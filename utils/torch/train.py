@@ -1,4 +1,7 @@
-from typing import Any, Tuple, List
+from typing import Any
+from typing import Tuple
+from typing import List
+from typing import Callable
 import os
 import os.path
 import shutil
@@ -8,7 +11,7 @@ import torch.nn
 import numpy as np
 import utils.torch.data
 
-def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: torch.utils.data.DataLoader) -> Tuple[list, float]:
+def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None) -> Tuple[list, float]:
     """
     Minimum do_epoch example
     1. Select device to send tensors
@@ -30,22 +33,13 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
 
     # Select iterator decorator
     train_type = 'Train' if model.training else 'Valid'
-    iterator = utils.get_tqdm(dataloader, execution['iterator'], ascii=True, desc="({}) Epoch {:>3d}/{:>3d}, Loss {:0.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.inf))
-
-    # Instantiate losses
-    criterion_reconstruction = utils.class_selector('utils.torch.loss', execution['model']['loss'])(batch_size=execution['loader']['batch_size'], input_shape=execution['input_shape'])
-    if 'classifier' in execution:
-        criterion_classification = utils.class_selector('utils.torch.loss', execution['classifier']['loss'])()
+    iterator = utils.get_tqdm(dataloader, execution['iterator'], desc="({}) Epoch {:>3d}/{:>3d}, Loss {:0.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.inf))
 
     # Iterate over all data in train/validation/test dataloader:
-    i = 0
     print_loss = np.inf
-    for X, y in iterator:
-        # Change iterator description
-        if isinstance(iterator,tqdm.tqdm):
-            iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], print_loss))
-
-        # Apply data augmentation
+    loss = 0
+    for i, (X, y) in enumerate(iterator):
+        # # Apply data augmentation
         if model.training and ('augmentation' in execution):
             X = augmentation(X)
 
@@ -58,44 +52,31 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
             state['optimizer'].zero_grad()
 
         # Predict input data
-        if 'classifier' in execution:
-            (X_pred, y_pred, mu, logvar) = model(X)
-        else:
-            (X_pred, mu, logvar) = model(X)
+        out = model(X)
+        if not isinstance(out, tuple):
+            out = (out,)
 
         # Calculate loss
-        loss = criterion_reconstruction(X_pred, X, mu, logvar)
-        rec_loss = loss.item()
-
-        # Regularization loss
-        # for param in model.parameters():
-        #     loss += torch.mean(torch.abs(param))
-
-        if 'classifier' in execution:
-            loss += criterion_classification(y_pred, y.long().squeeze())
-            del y_pred
+        loss = criterion(X,y,*out)
 
         # Break early
         if torch.isnan(loss):
-            raise ValueError("Nan loss value encountered")
+            raise ValueError("Nan loss value encountered. Stopping...")
 
-        print_loss = loss.detach().item()
-        # print("i = {}:\t{}, {}, {}".format(i,rec_loss, print_loss-rec_loss, print_loss))
-
+        # Retrieve for printing purposes
+        print_loss = metric(X,y,*out) if metric is not None else loss.item()
+        
         # Optimize network's weights
         if model.training:
             loss.backward()
-            torch.nn.utils.clip_grad_norm_(model.parameters(),0.1)
             state['optimizer'].step()
 
         # Accumulate losses
-        batch_loss[i] += loss.detach().item()
-        
-        # Update counter (yes, way easier ways to do it)
-        i += 1
+        batch_loss[i] += print_loss
 
-        # Avoid memory cluttering
-        del X, y, X_pred, loss, mu, logvar
+        # Change iterator description
+        if isinstance(iterator,tqdm.tqdm):
+            iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], print_loss))
         
     if isinstance(iterator, tqdm.tqdm):
         iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.mean(batch_loss)))
@@ -103,7 +84,7 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
     return batch_loss, np.sum(batch_loss)/dataloader.batch_size
 
 
-def train_model(model, state: dict, execution: dict, loader_train: torch.utils.data.DataLoader, loader_valid: torch.utils.data.DataLoader):
+def train_model(model, state: dict, execution: dict, loader_train: torch.utils.data.DataLoader, loader_valid: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None):
     model = model.to(state['device'])
 
     epoch_train = []
@@ -115,16 +96,17 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             state['epoch'] = epoch
             
             # Training model
-            loss_train, state['train_loss'] = do_epoch(model.train(), state, execution, loader_train)
+            loss_train, state['train_loss'] = do_epoch(model.train(), state, execution, loader_train, criterion, metric)
             epoch_train.append(loss_train)
 
             # Validate results
-            loss_valid, state['validation_loss'] = do_epoch(model.eval(), state, execution, loader_valid)
+            loss_valid, state['validation_loss'] = do_epoch(model.eval(), state, execution, loader_valid, criterion, metric)
             epoch_valid.append(loss_valid)
 
             # Update learning rate scheduler
             if 'scheduler' in state:
-                state['scheduler'].step(state['validation_loss'])
+                state['scheduler'].step(np.mean(loss_valid))
+                # state['scheduler'].step(state['validation_loss'])
 
             # Checkpoint model when best performance
             state['model_state_dict'] = model.state_dict()
@@ -140,11 +122,11 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
                 # Copy checkpoint and mark as best
                 shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.state'), os.path.join(execution['save_directory'],'model_best.state'))
             
-            # Apply early stopping if scheduler not being used
-            if ('scheduler' not in state) and ('patience' in execution):
-                if epoch-state['best_epoch'] >= execution['patience']:
-                    print(" * No improvement in {} epochs, stopping".format(patience))
-                    break
+            # # Apply early stopping if scheduler not being used
+            # if ('scheduler' not in state) and ('patience' in execution):
+            #     if epoch-state['best_epoch'] >= execution['patience']:
+            #         print(" * No improvement in {} epochs, stopping".format(patience))
+            #         break
         except KeyboardInterrupt:
             utils.pickledump(state, os.path.join(execution['save_directory'],'keyboard_interrupt.state'), mode='wb')
             raise
