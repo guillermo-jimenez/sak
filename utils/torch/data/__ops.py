@@ -28,7 +28,7 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, i: int):
         '''Generates one datapoint''' 
-        return self.X[None,i,], self.y[i,]
+        return self.X[i,], self.y[i,]
 
 
 class DatasetWFDB(torch.utils.data.Dataset):
