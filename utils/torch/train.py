@@ -53,8 +53,7 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
 
         # Predict input data
         out = model(X)
-        if not isinstance(out, tuple):
-            out = (out,)
+        out = (out,) if not isinstance(out, tuple) else out
 
         # Calculate loss
         loss = criterion(X,y,*out)
@@ -81,10 +80,10 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
     if isinstance(iterator, tqdm.tqdm):
         iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.mean(batch_loss)))
 
-    return batch_loss, np.sum(batch_loss)/dataloader.batch_size
+    return batch_loss
 
 
-def train_model(model, state: dict, execution: dict, loader_train: torch.utils.data.DataLoader, loader_valid: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None):
+def train_model(model, state: dict, execution: dict, loader_train: torch.utils.data.DataLoader, loader_valid: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None, smaller=True):
     model = model.to(state['device'])
 
     epoch_train = []
@@ -96,17 +95,18 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             state['epoch'] = epoch
             
             # Training model
-            loss_train, state['train_loss'] = do_epoch(model.train(), state, execution, loader_train, criterion, metric)
+            loss_train = do_epoch(model.train(), state, execution, loader_train, criterion, metric)
+            state['train_loss'] = np.mean(loss_train)
             epoch_train.append(loss_train)
 
             # Validate results
-            loss_valid, state['validation_loss'] = do_epoch(model.eval(), state, execution, loader_valid, criterion, metric)
+            loss_valid = do_epoch(model.eval(), state, execution, loader_valid, criterion, metric)
+            state['validation_loss'] = np.mean(loss_valid)
             epoch_valid.append(loss_valid)
 
             # Update learning rate scheduler
             if 'scheduler' in state:
-                state['scheduler'].step(np.mean(loss_valid))
-                # state['scheduler'].step(state['validation_loss'])
+                state['scheduler'].step(state['validation_loss'])
 
             # Checkpoint model when best performance
             state['model_state_dict'] = model.state_dict()
@@ -115,7 +115,7 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             utils.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
             
             # Check if loss is best loss
-            if state['validation_loss'] < state['best_loss']:
+            if ((smaller) and (state['validation_loss'] < state['best_loss'])) or ((not smaller) and (state['validation_loss'] > state['best_loss'])):
                 state['best_loss'] = state['validation_loss']
                 state['best_epoch'] = epoch
                 
