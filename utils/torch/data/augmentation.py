@@ -7,6 +7,16 @@ from utils.__ops import required
 from utils.__ops import check_required
 
 
+class none(object):
+    """Do not add any noise to the signal"""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, X: torch.Tensor) -> torch.Tensor:
+        return X
+
+
 class AdditiveWhiteGaussianNoise(object):
     """Add additive white gaussian noise to a signal
 
