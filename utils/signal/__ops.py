@@ -2,6 +2,8 @@ from typing import List
 from typing import Tuple
 import numpy as np
 
+StandardHeader = np.array(['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'])
+
 def flatten_along_axis(X: np.ndarray, axis: int = None):
     if axis != None:
         X = X.reshape((X.shape[axis], np.prod(np.delete(X.shape,axis))))
