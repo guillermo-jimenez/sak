@@ -19,16 +19,16 @@ class Dataset(torch.utils.data.Dataset):
         '''Initialization'''
         
         # Store input
-        self.X = torch.from_numpy(X)
-        self.y = torch.from_numpy(y)
+        self.X = X
+        self.y = y
 
     def __len__(self):
-        '''Denotes the number of batches per epoch'''
-        return self.X.shape[0]
+        '''Denotes the number of elements in the dataset'''
+        return len(self.X)
 
     def __getitem__(self, i: int):
         '''Generates one datapoint''' 
-        return self.X[i,], self.y[i,]
+        return torch.from_numpy(self.X[i]), torch.from_numpy(self.y[i])
 
 
 class DatasetWFDB(torch.utils.data.Dataset):
