@@ -130,7 +130,7 @@ def update_regularization(regularization_list: list = required, network_params: 
     return regularization_list
         
     
-class ModelGraph(torch.nn.Module):
+class ModelGraph(Module):
     r"""A model composer"""
 
     def __init__(self, json):
@@ -222,10 +222,10 @@ class ModelGraph(torch.nn.Module):
                 self.return_order.append((acc_string,structure.get('order',nan)))
             return acc_string
             
-    def forward(self, input: torch.Tensor) -> Tuple[torch.Tensor]:
+    def forward(self, input: Tensor) -> Tuple[Tensor]:
         partial = {"input" : (input,)}
         output = [nan for _ in range(len(self.return_order))]
-        for node_from, nodes_to in tmp.graph.adjacency():
+        for node_from, nodes_to in self.graph.adjacency():
             # Retrieve input
             if isinstance(node_from, tuple):
                 x = []
@@ -234,7 +234,6 @@ class ModelGraph(torch.nn.Module):
                 x = tuple(x)
             else:
                 x = (partial[node_from],)
-
 
             # Compute output
             for n in nodes_to:
