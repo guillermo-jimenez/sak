@@ -130,6 +130,17 @@ def update_regularization(regularization_list: list = required, network_params: 
     return regularization_list
         
     
+class Lambda(Module):
+    def __init__(self, lmbda, *args, **kwargs):
+        super(Lambda, self).__init__()
+        self.lmbda = lmbda
+        self.args = args
+        self.kwargs = kwargs
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.lmbda(x, *self.args, **self.kwargs)
+        
+        
 class ModelGraph(Module):
     r"""A model composer"""
 
