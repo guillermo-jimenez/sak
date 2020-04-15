@@ -86,6 +86,9 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
 def train_model(model, state: dict, execution: dict, loader_train: torch.utils.data.DataLoader, loader_valid: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None, smaller=True):
     model = model.to(state['device'])
 
+    if 'best_loss' not in state:
+        state['best_loss'] = -np.inf if not smaller else np.inf
+
     epoch_train = []
     epoch_valid = []
 
