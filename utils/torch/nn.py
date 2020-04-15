@@ -1,11 +1,16 @@
 import utils
 import operator
+import networkx
 from collections import OrderedDict
+from torch._jit_internal import _copy_to_script_wrapper
+from itertools import islice
 from typing import Any
 from typing import List
 from typing import Tuple
-from torch._jit_internal import _copy_to_script_wrapper
-from itertools import islice
+from numpy import array
+from numpy import argsort
+from numpy import arange
+from numpy import nan
 from torch import Tensor
 from torch import Size
 from torch import exp
@@ -125,6 +130,125 @@ def update_regularization(regularization_list: list = required, network_params: 
     return regularization_list
         
     
+class ModelGraph(torch.nn.Module):
+    r"""A model composer"""
+
+    def __init__(self, json):
+        super(ModelGraph, self).__init__()
+        
+        # Initialize operation graph
+        self.graph = networkx.DiGraph()
+        self.graph.add_node("input", returns=False)
+        self.return_order = []
+        
+        # Compose network
+        self.__compose(json)
+        
+        # Order returns
+        keys = [self.return_order[i][0] for i in range(len(self.return_order))]
+        order = [self.return_order[i][1] for i in range(len(self.return_order))]
+        keys = array(keys)[argsort(order)]
+        self.return_order = dict(zip(keys,arange(keys.size)))        
+        
+        
+    def _get_item_by_idx(self, iterator, idx):
+        """Get the idx-th item of the iterator"""
+        size = len(self)
+        idx = operator.index(idx)
+        if not -size <= idx < size:
+            raise IndexError('index {} is out of range'.format(idx))
+        idx %= size
+        return next(islice(iterator, idx, None))
+
+    @_copy_to_script_wrapper
+    def __getitem__(self, idx):
+        if isinstance(idx, slice):
+            return self.__class__(OrderedDict(list(self._modules.items())[idx]))
+        elif isinstance(idx, str):
+            return self._modules[idx]
+        else:
+            return self._get_item_by_idx(self._modules.values(), idx)
+
+    def __setitem__(self, idx, module):
+        key = self._get_item_by_idx(self._modules.keys(), idx)
+        return setattr(self, key, module)
+
+    def __delitem__(self, idx):
+        if isinstance(idx, slice):
+            for key in list(self._modules.keys())[idx]:
+                delattr(self, key)
+        else:
+            key = self._get_item_by_idx(self._modules.keys(), idx)
+            delattr(self, key)
+
+    @_copy_to_script_wrapper
+    def __len__(self):
+        return len(self._modules)
+
+    @_copy_to_script_wrapper
+    def __dir__(self):
+        keys = super(Parallel, self).__dir__()
+        keys = [key for key in keys if not key.isdigit()]
+        return keys
+
+    @_copy_to_script_wrapper
+    def __iter__(self):
+        return iter(self._modules.values())
+        
+    def __compose(self, structure, node_father = "input", i = 0, acc_string = ""):
+        if isinstance(structure, list):
+            for j in range(len(structure)):
+                res = self.__compose(structure[j], node_father, j, acc_string + "_" + str(j) if acc_string != "" else str(j))
+                if isinstance(res, tuple):
+                    if j != len(structure)-1:
+                        for r in res:
+                            self.graph.add_edge(r, res)
+                else:
+                    self.graph.add_edge(node_father, res)
+                node_father = res
+            # return res
+        elif isinstance(structure, tuple):
+            nodes = []
+            for j in range(len(structure)):
+                res = self.__compose(structure[j], node_father, j, acc_string + "_" + str(j) if acc_string != "" else str(j))
+                nodes.append(res)
+                if res is not None:
+                    self.graph.add_edge(node_father, res)
+            return tuple(nodes)
+        else:
+            self.add_module(acc_string, utils.class_selector('utils.torch.nn',structure['name'])(**structure.get('arguments',{})))
+            self.graph.add_node(acc_string, returns=structure.get('returns',False))
+            if structure.get('returns',False):
+                self.return_order.append((acc_string,structure.get('order',nan)))
+            return acc_string
+            
+    def forward(self, input: torch.Tensor) -> Tuple[torch.Tensor]:
+        partial = {"input" : (input,)}
+        output = [nan for _ in range(len(self.return_order))]
+        for node_from, nodes_to in tmp.graph.adjacency():
+            # Retrieve input
+            if isinstance(node_from, tuple):
+                x = []
+                for n in node_from:
+                    x.append(partial[n])
+                x = tuple(x)
+            else:
+                x = (partial[node_from],)
+
+
+            # Compute output
+            for n in nodes_to:
+                if isinstance(n, tuple):
+                    pass
+                else:
+                    partial[n] = self[n](*x)
+        for k in partial:
+            if self.graph.nodes[k]['returns']:
+                output[self.return_order[k]] = partial[k]
+        
+        return tuple(output)
+        
+
 class Sequential(Module):
     r"""Another sequential container.
     Modules will be added to it in the order they are passed in the constructor.
