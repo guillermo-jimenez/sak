@@ -99,17 +99,17 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             
             # Training model
             loss_train = do_epoch(model.train(), state, execution, loader_train, criterion, metric)
-            state['train_loss'] = np.mean(loss_train)
+            state['loss_train'] = np.mean(loss_train)
             epoch_train.append(loss_train)
 
             # Validate results
             loss_valid = do_epoch(model.eval(), state, execution, loader_valid, criterion, metric)
-            state['validation_loss'] = np.mean(loss_valid)
+            state['loss_validation'] = np.mean(loss_valid)
             epoch_valid.append(loss_valid)
 
             # Update learning rate scheduler
             if 'scheduler' in state:
-                state['scheduler'].step(state['validation_loss'])
+                state['scheduler'].step(state['loss_validation'])
 
             # Checkpoint model when best performance
             state['model_state_dict'] = model.state_dict()
@@ -118,8 +118,8 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             utils.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
             
             # Check if loss is best loss
-            if ((smaller) and (state['validation_loss'] < state['best_loss'])) or ((not smaller) and (state['validation_loss'] > state['best_loss'])):
-                state['best_loss'] = state['validation_loss']
+            if ((smaller) and (state['loss_validation'] < state['best_loss'])) or ((not smaller) and (state['loss_validation'] > state['best_loss'])):
+                state['best_loss'] = state['loss_validation']
                 state['best_epoch'] = epoch
                 
                 # Copy checkpoint and mark as best
@@ -137,3 +137,4 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             utils.pickledump(state, os.path.join(execution['save_directory'],'error.state'), mode='wb')
             raise
             
+    return state
