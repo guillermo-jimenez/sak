@@ -168,7 +168,7 @@ class ChangeAmplitude(object):
         check_required(self, self.__dict__)
 
     def __call__(self, X: torch.Tensor) -> torch.Tensor:
-        Noise         = (self.percentage*X.abs().max())*torch.randn(*X.shape[0:-1])[:,None].type(X.type())
+        Noise         = (self.percentage*X.abs().max())*torch.randn(*X.shape[0:-1])[...,None].type(X.type())
 
         return X + Noise
 
