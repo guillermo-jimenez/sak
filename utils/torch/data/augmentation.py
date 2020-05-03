@@ -81,9 +81,10 @@ class PowerlineNoise(object):
     def __call__(self, X: torch.Tensor) -> torch.Tensor:
         """
         Args:
-            sample (torch.Tensor): tensor to apply transformation on. Format batch_size x channels x samples
+            sample (torch.Tensor): tensor to apply transformation on.
         """
-        Noise         = torch.zeros_like(X)
+        Noise         = torch.ones_like(X)
+        Noise[...,:]  = torch.arange(X.shape[-1])
 
         SignalPower   = torch.mean((X - torch.mean(X, dim=-1, keepdim=True))**2, dim=-1, keepdim=True)
         SNRdb         = self.SNR + (self.SNR/10)*np.random.uniform(-1,1)
@@ -93,9 +94,7 @@ class PowerlineNoise(object):
         NoisePower    = SignalPower/10**(SNRdb/10.)
         Amplitude     = np.sqrt(2*NoisePower)
 
-        for b in range(X.shape[0]):
-            for c in range(X.shape[1]):
-                Noise[b,c,] = Amplitude[b,c]*torch.sin(NormFreq*torch.arange(X.shape[-1]).type(X.type()) + np.pi*np.random.uniform(-1,1))
+        Noise         = (Amplitude*torch.sin(NormFreq*Noise) + np.pi*np.random.uniform(-1,1)).type(X.type())
         
         return X + Noise
 
@@ -116,7 +115,8 @@ class BaselineNoise(object):
         check_required(self, self.__dict__)
 
     def __call__(self, X: torch.Tensor) -> torch.Tensor:
-        Noise         = torch.zeros_like(X)
+        Noise         = torch.ones_like(X)
+        Noise[...,:]  = torch.arange(X.shape[-1])
 
         SignalPower   = torch.mean((X - torch.mean(X, dim=-1, keepdim=True))**2, dim=-1, keepdim=True)
         SNRdb         = self.SNR + (self.SNR/10)*np.random.uniform(-1,1)
@@ -126,9 +126,7 @@ class BaselineNoise(object):
         NoisePower    = SignalPower/10**(SNRdb/10.)
         Amplitude     = np.sqrt(2*NoisePower)
         
-        for b in range(X.shape[0]):
-            for c in range(X.shape[1]):
-                Noise[b,c,] = Amplitude[b,c]*torch.sin(NormFreq*torch.arange(X.shape[-1]).type(X.type()) + np.pi*np.random.uniform(-1,1))
+        Noise         = (Amplitude*torch.sin(NormFreq*Noise) + np.pi*np.random.uniform(-1,1)).type(X.type())
 
         return X + Noise
 
