@@ -56,14 +56,14 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
         out = (out,) if not isinstance(out, tuple) else out
 
         # Calculate loss
-        loss = criterion(X,y,*out)
+        loss = criterion((X,y),out)
 
         # Break early
         if torch.isnan(loss):
             raise ValueError("Nan loss value encountered. Stopping...")
 
         # Retrieve for printing purposes
-        print_loss = metric(X,y,*out) if metric is not None else loss.item()
+        print_loss = metric((X,y),out) if metric is not None else loss.item()
         
         # Optimize network's weights
         if model.training:
@@ -125,11 +125,6 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
                 # Copy checkpoint and mark as best
                 shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.state'), os.path.join(execution['save_directory'],'model_best.state'))
             
-            # # Apply early stopping if scheduler not being used
-            # if ('scheduler' not in state) and ('patience' in execution):
-            #     if epoch-state['best_epoch'] >= execution['patience']:
-            #         print(" * No improvement in {} epochs, stopping".format(patience))
-            #         break
         except KeyboardInterrupt:
             utils.pickledump(state, os.path.join(execution['save_directory'],'keyboard_interrupt.state'), mode='wb')
             raise
