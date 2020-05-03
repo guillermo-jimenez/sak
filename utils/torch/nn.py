@@ -208,24 +208,29 @@ class ModelGraph(Module):
         
     def __compose(self, structure, node_father = "input", i = 0, acc_string = ""):
         if isinstance(structure, list):
-            for j in range(len(structure)):
-                res = self.__compose(structure[j], node_father, j, acc_string + "_" + str(j) if acc_string != "" else str(j))
-                if isinstance(res, tuple):
-                    if j != len(structure)-1:
-                        for r in res:
-                            self.graph.add_edge(r, res)
-                else:
-                    self.graph.add_edge(node_father, res)
-                node_father = res
-            # return res
-        elif isinstance(structure, tuple):
-            nodes = []
-            for j in range(len(structure)):
-                res = self.__compose(structure[j], node_father, j, acc_string + "_" + str(j) if acc_string != "" else str(j))
-                nodes.append(res)
-                if res is not None:
-                    self.graph.add_edge(node_father, res)
-            return tuple(nodes)
+            if not isinstance(structure[0], str):
+                structure.insert(0,"series") # Default structure
+            elif structure[0].lower() not in ['series', 'parallel']:
+                raise NotImplementedError(("Execution paths other than 'series' or 'parallel' " +
+                                           "are not yet implemented. Inputted {}.".format(structure[0])))
+            if structure[0].lower() == 'series':
+                for j in range(1,len(structure)):
+                    res = self.__compose(structure[j], node_father, j, acc_string + "_" + str(j) if acc_string != "" else str(j))
+                    if isinstance(res, tuple):
+                        if j != len(structure)-1:
+                            for r in res:
+                                self.graph.add_edge(r, res)
+                    else:
+                        self.graph.add_edge(node_father, res)
+                    node_father = res
+            elif structure[0].lower() == 'parallel':
+                nodes = []
+                for j in range(1,len(structure)):
+                    res = self.__compose(structure[j], node_father, j, acc_string + "_" + str(j) if acc_string != "" else str(j))
+                    nodes.append(res)
+                    if res is not None:
+                        self.graph.add_edge(node_father, res)
+                return tuple(nodes)
         else:
             self.add_module(acc_string, utils.class_selector('utils.torch.nn',structure['name'])(**structure.get('arguments',{})))
             self.graph.add_node(acc_string, returns=structure.get('returns',False))
@@ -258,6 +263,21 @@ class ModelGraph(Module):
         
         return tuple(output)
         
+    def draw_networkx(self, ):
+        try: # In case graphviz is installed (mostly for my own use)
+            pos = networkx.drawing.nx_agraph.graphviz_layout(self.graph)
+        except (NameError, ModuleNotFoundError, ImportError) as e:
+            pos = networkx.drawing.layout.planar_layout(self.graph)
+
+        networkx.draw_networkx_nodes(self.graph, pos,
+                            nodelist=list(self.return_order.keys()),
+                            node_color='r')
+        networkx.draw_networkx_nodes(self.graph, pos,
+                            nodelist=[n for n in list(self.graph.nodes.keys()) if n not in list(self.return_order.keys())],
+                            node_color='b')
+        networkx.draw_networkx_edges(self.graph, pos, width=1.0, alpha=0.5)
+        networkx.draw_networkx_labels(self.graph, pos, dict(zip(self.graph.nodes.keys(),self.graph.nodes.keys())), font_size=16)
+
 
 class Sequential(Module):
     r"""Another sequential container.
@@ -864,7 +884,6 @@ class Residual(Module):
             x = self.output_operation(x)
 
         return self.addition(x, h) # Residual connection
-
 
 class Dropout1d(Module):
     """Applies one-dimensional spatial dropout"""
