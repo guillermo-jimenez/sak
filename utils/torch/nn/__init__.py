@@ -96,6 +96,7 @@ from ._ops import none
 from ._ops import Identity
 from ._ops import Add
 from ._ops import Squeeze
+from ._ops import Unsqueeze
 from ._ops import View
 from ._ops import UnFlatten
 from ._ops import GlobalAvgPooling1d
