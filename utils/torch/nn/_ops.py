@@ -263,7 +263,7 @@ class ModelGraph(Module):
         
         return tuple(output)
         
-    def draw_networkx(self, ):
+    def draw_networkx(self):
         try: # In case graphviz is installed (mostly for my own use)
             pos = networkx.drawing.nx_agraph.graphviz_layout(self.graph)
         except (NameError, ModuleNotFoundError, ImportError) as e:
