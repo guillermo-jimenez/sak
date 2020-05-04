@@ -94,7 +94,7 @@ class PowerlineNoise(object):
         NoisePower    = SignalPower/10**(SNRdb/10.)
         Amplitude     = np.sqrt(2*NoisePower)
 
-        Noise         = (Amplitude*torch.sin(NormFreq*Noise) + np.pi*np.random.uniform(-1,1)).type(X.type())
+        Noise         = (Amplitude*torch.sin(NormFreq*Noise + np.pi*np.random.uniform(-1,1))).type(X.type())
         
         return X + Noise
 
@@ -115,7 +115,7 @@ class BaselineNoise(object):
         check_required(self, self.__dict__)
 
     def __call__(self, X: torch.Tensor) -> torch.Tensor:
-        Noise         = torch.ones_like(X)
+        Noise         = torch.zeros_like(X)
         Noise[...,:]  = torch.arange(X.shape[-1])
 
         SignalPower   = torch.mean((X - torch.mean(X, dim=-1, keepdim=True))**2, dim=-1, keepdim=True)
@@ -125,8 +125,8 @@ class BaselineNoise(object):
         NormFreq      = 2.*np.pi*Freq/self.signal_freq # Normalized frequency
         NoisePower    = SignalPower/10**(SNRdb/10.)
         Amplitude     = np.sqrt(2*NoisePower)
-        
-        Noise         = (Amplitude*torch.sin(NormFreq*Noise) + np.pi*np.random.uniform(-1,1)).type(X.type())
+
+        Noise         = (Amplitude*torch.sin(NormFreq*Noise + np.pi*np.random.uniform(-1,1))).type(X.type())
 
         return X + Noise
 
