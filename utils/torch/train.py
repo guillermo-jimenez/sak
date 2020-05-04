@@ -45,7 +45,7 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
 
         # Send elements to device
         X = X.float().to(state['device'], non_blocking=True)
-        y = y.float().to(state['device'], non_blocking=True)
+        y = y.to(state['device'], non_blocking=True)
 
         # Set gradient to zero
         if model.training: 
@@ -131,5 +131,3 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
         except:
             utils.pickledump(state, os.path.join(execution['save_directory'],'error.state'), mode='wb')
             raise
-            
-    return state
