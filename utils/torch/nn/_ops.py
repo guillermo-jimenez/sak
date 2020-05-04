@@ -706,6 +706,30 @@ class Squeeze(Module):
         return x.squeeze()
 
 
+class Unsqueeze(Module):
+    r"""A placeholder identity operator that is argument-insensitive.
+
+    Args:
+        args: any argument (unused)
+        kwargs: any keyword argument (unused)
+
+    Examples::
+
+        >>> m = Identity(54, unused_argument1=0.1, unused_argument2=False)
+        >>> x = torch.randn(128, 20)
+        >>> output = m(x)
+        >>> print(output.size())
+        torch.Size([128, 20])
+
+    """
+    def __init__(self, dim, *args, **kwargs):
+        super(Unsqueeze, self).__init__()
+        self.dim = dim
+
+    def forward(self, x: Tensor) -> Tensor:
+        return x.unsqueeze(self.dim)
+
+
 class View(Module):
     def __init__(self, *shape, **kwargs):
         super(View, self).__init__()
@@ -722,33 +746,6 @@ class UnFlatten(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return x.view(x.shape[0], *self.shape)
-
-
-# class Regularization(Module):
-#     def __init__(self, activation: dict = {}, normalization: dict = {}, dropout: dict = {}):
-#         super(Regularization, self).__init__()
-
-#         # Declare operations
-#         self.regularization = []
-#         self.activation = False
-#         self.normalization = False
-#         self.dropout = False
-
-#         if activation.get("module"):
-#             self.activation = utils.class_selector("utils.torch.activation", activation["module"])(**activation.get("arguments", {}))
-#         if normalization.get("module"):
-#             self.normalization = utils.class_selector("utils.torch.normalization", normalization["module"])(**normalization.get("arguments", {}))
-#         if dropout.get("module"):
-#             self.dropout = utils.class_selector("utils.torch.dropout", dropout["module"])(**dropout.get("arguments", {}))
-
-#     def forward(self, x: Tensor) -> Tensor:
-#         if self.activation:
-#             x = self.activation(x)
-#         if self.normalization:
-#             x = self.normalization(x)
-#         if self.dropout:
-#             x = self.dropout(x)
-#         return x
 
 
 class GlobalAvgPooling1d(Module):
