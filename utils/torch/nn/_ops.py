@@ -114,16 +114,16 @@ def update_regularization(regularization_list: list = required, network_params: 
     # Iterate over parameters list to check if update is needed
     for i in range(len(regularization_list)):
         # Iterate over contained parameters (exclude default)
-        for arg in regularization_list[i].get('arguments',{}):
+        for arg in regularization_list[i].get("arguments",{}):
             # Case batchnorm
-            if arg == 'num_features':
-                # Check the model's operation parameters
+            if arg == "num_features":
+                # Check the model"s operation parameters
                 for p in network_params:
                     # If 
-                    if preoperation and (p in ['in_channels', 'in_features', 'input_size', 'd_model']):
-                        regularization_list[i]['arguments'][arg] = network_params[p]
-                    elif not preoperation and (p in ['out_channels', 'out_features', 'hidden_size', 'd_model']):
-                        regularization_list[i]['arguments'][arg] = network_params[p]
+                    if preoperation and (p in ["in_channels", "in_features", "input_size", "d_model"]):
+                        regularization_list[i]["arguments"][arg] = network_params[p]
+                    elif not preoperation and (p in ["out_channels", "out_features", "hidden_size", "d_model"]):
+                        regularization_list[i]["arguments"][arg] = network_params[p]
 
             # Keep adding
             pass
@@ -150,17 +150,25 @@ class ModelGraph(Module):
         # Initialize operation graph
         self.graph = networkx.DiGraph()
         self.graph.add_node("input", returns=False)
-        self.return_order = []
+        self.__return_order = []
+        
+        # Make space for plausible function names
+        # Initialize with default function
+        self.__function_list = [("forward","input")] 
         
         # Compose network
         self.__compose(json)
         
         # Order returns
-        keys = [self.return_order[i][0] for i in range(len(self.return_order))]
-        order = [self.return_order[i][1] for i in range(len(self.return_order))]
+        keys = [self.__return_order[i][0] for i in range(len(self.__return_order))]
+        order = [self.__return_order[i][1] for i in range(len(self.__return_order))]
         keys = array(keys)[argsort(order)]
-        self.return_order = dict(zip(keys,arange(keys.size)))        
+        self.__return_order = dict(zip(keys,arange(keys.size)))        
         
+        # Initialize forward function
+        for (fname, starting_node) in self.__function_list:
+            setattr(self, fname, self.__set_fcn(fname,starting_node))
+            
         
     def _get_item_by_idx(self, iterator, idx):
         """Get the idx-th item of the iterator"""
@@ -206,74 +214,121 @@ class ModelGraph(Module):
     def __iter__(self):
         return iter(self._modules.values())
         
-    def __compose(self, structure, node_father = "input", i = 0, acc_string = ""):
-        if isinstance(structure, list):
-            if not isinstance(structure[0], str):
-                structure.insert(0,"series") # Default structure
-            elif structure[0].lower() not in ['series', 'parallel']:
-                raise NotImplementedError(("Execution paths other than 'series' or 'parallel' " +
-                                           "are not yet implemented. Inputted {}.".format(structure[0])))
-            if structure[0].lower() == 'series':
-                for j in range(1,len(structure)):
-                    res = self.__compose(structure[j], node_father, j, acc_string + "_" + str(j) if acc_string != "" else str(j))
+    def __compose(self, structure, node_father = "input", acc_string = ""):
+        # Marks start of a structure (series, parallel)
+        if ("type" in structure) or ("modules" in structure):
+            # If structure type is series:
+            if structure.get("type","series").lower() == 'series':
+                # Sanity check
+                if "modules" not in structure:
+                    raise ValueError("Missing module list of the structure")
+                    
+                # Add all elements as children of the previous element in the series
+                for j in range(len(structure["modules"])):
+                    res = self.__compose(structure["modules"][j], node_father, acc_string + "_" + str(j+1) if acc_string != "" else str(j+1))
                     if isinstance(res, tuple):
-                        if j != len(structure)-1:
+                        if j != len(structure["modules"])-1:
                             for r in res:
                                 self.graph.add_edge(r, res)
                     else:
                         self.graph.add_edge(node_father, res)
                     node_father = res
-            elif structure[0].lower() == 'parallel':
+            # If the structure is parallel (No default here, absorved by last conditional)
+            elif structure["type"].lower() == 'parallel': 
                 nodes = []
-                for j in range(1,len(structure)):
-                    res = self.__compose(structure[j], node_father, j, acc_string + "_" + str(j) if acc_string != "" else str(j))
+                for j in range(len(structure["modules"])):
+                    res = self.__compose(structure["modules"][j], node_father, acc_string + "_" + str(j+1) if acc_string != "" else str(j+1))
                     nodes.append(res)
                     if res is not None:
                         self.graph.add_edge(node_father, res)
                 return tuple(nodes)
-        else:
-            self.add_module(acc_string, utils.class_selector('utils.torch.nn',structure['name'])(**structure.get('arguments',{})))
-            self.graph.add_node(acc_string, returns=structure.get('returns',False))
-            if structure.get('returns',False):
-                self.return_order.append((acc_string,structure.get('order',nan)))
-            return acc_string
-            
-    def forward(self, input: Tensor) -> Tuple[Tensor]:
-        partial = {"input" : (input,)}
-        output = [nan for _ in range(len(self.return_order))]
-        for node_from, nodes_to in self.graph.adjacency():
-            # Retrieve input
-            if isinstance(node_from, tuple):
-                x = []
-                for n in node_from:
-                    x.append(partial[n])
-                x = tuple(x)
             else:
-                x = (partial[node_from],)
+                raise NotImplementedError(("Execution paths other than 'series' or 'parallel' " +
+                                            "are not yet implemented. Inputted {}.".format(structure[0])))
+        # Else is an operation
+        else:
+            # Sanity check: did not include tuples or lists
+            if isinstance(structure, tuple) or isinstance(structure, list):
+                raise ValueError("Beware, module contains nested list. Refer to API")
+            
+            # Add executable torch.nn.Module (must have "forward" function implemented) to pile
+            self.add_module(structure.get('name',acc_string), utils.class_selector('utils.torch.nn',structure['module'])(**structure.get('arguments',{})))
+            
+            # Add module information to execution graph
+            self.graph.add_node(structure.get('name',acc_string), returns=structure.get('returns',False))
+            
+            # Check if returns anything
+            if structure.get('returns',False):
+                self.__return_order.append((structure.get('name',acc_string),structure.get('order',nan)))
+                
+            # Check if it needs its own execution function
+            if structure.get('function',False):
+                self.__function_list.append((structure.get('function'),structure.get('name',acc_string)))
+            
+            # Return node name
+            return structure.get('name',acc_string)
 
-            # Compute output
-            for n in nodes_to:
-                if isinstance(n, tuple):
-                    pass
+    # Function maker for all plausible addable functions
+    def __set_fcn(self,name,start_node):
+        # Retrieve function call with provided name. Static 
+        # starting node (hence the difference between calls)
+        def call(input: Tensor) -> Tuple[Tensor]:
+            # Store input in partial computation
+            partial = {start_node : input}
+            
+            # Check if "input" node is starting node (should be a 
+            # better way with the graph, but little overhead anyway)
+            is_start_node = False
+            for node_from, nodes_to in self.graph.adjacency():
+                # Check if it is starting node (should be a better
+                # way with the graph, but little overhead anyway)
+                if not is_start_node: 
+                    if (node_from != start_node):
+                        continue
+                    else:
+                        is_start_node = True
+                
+                # Retrieve input. Enclose in tuple to avoid splitting in tensor axes
+                if isinstance(node_from, tuple):
+                    x = []
+                    for n in node_from:
+                        x.append(partial[n])
+                    x = tuple(x)
                 else:
-                    partial[n] = self[n](*x)
-        for k in partial:
-            if self.graph.nodes[k]['returns']:
-                output[self.return_order[k]] = partial[k]
+                    x = (partial[node_from],)
+
+                # Compute output
+                for n in nodes_to:
+                    # If node_to is tuple, merging point of parallel
+                    # branches (no operation to be performed in that case)
+                    if not isinstance(n, tuple):
+                        partial[n] = self[n](*x)
+            
+            # Declare outputs (vector of nan in case no return)
+            output = [nan for _ in range(len(self.__return_order))]
+            
+            # Retrieve the nodes marked as outputs into the structure
+            for n in partial:
+                if self.graph.nodes[n]['returns']:
+                    output[self.__return_order[n]] = partial[n]
+            
+            # Return output as a tuple
+            return tuple(output)
         
-        return tuple(output)
+        return call
+        # setattr(self, name, call)
         
-    def draw_networkx(self):
+    def draw_networkx(self, ):
         try: # In case graphviz is installed (mostly for my own use)
             pos = networkx.drawing.nx_agraph.graphviz_layout(self.graph)
         except (NameError, ModuleNotFoundError, ImportError) as e:
             pos = networkx.drawing.layout.planar_layout(self.graph)
 
         networkx.draw_networkx_nodes(self.graph, pos,
-                            nodelist=list(self.return_order.keys()),
+                            nodelist=list(self.__return_order.keys()),
                             node_color='r')
         networkx.draw_networkx_nodes(self.graph, pos,
-                            nodelist=[n for n in list(self.graph.nodes.keys()) if n not in list(self.return_order.keys())],
+                            nodelist=[n for n in list(self.graph.nodes.keys()) if n not in list(self.__return_order.keys())],
                             node_color='b')
         networkx.draw_networkx_edges(self.graph, pos, width=1.0, alpha=0.5)
         networkx.draw_networkx_labels(self.graph, pos, dict(zip(self.graph.nodes.keys(),self.graph.nodes.keys())), font_size=16)
@@ -296,10 +351,10 @@ class Sequential(Module):
 
         # Example of using Sequential with OrderedDict
         model = nn.Sequential(OrderedDict([
-                  ('conv1', nn.Conv2d(1,20,5)),
-                  ('relu1', nn.ReLU()),
-                  ('conv2', nn.Conv2d(20,64,5)),
-                  ('relu2', nn.ReLU())
+                  ("conv1", nn.Conv2d(1,20,5)),
+                  ("relu1", nn.ReLU()),
+                  ("conv2", nn.Conv2d(20,64,5)),
+                  ("relu2", nn.ReLU())
                 ]))
     """
 
@@ -317,7 +372,7 @@ class Sequential(Module):
         size = len(self)
         idx = operator.index(idx)
         if not -size <= idx < size:
-            raise IndexError('index {} is out of range'.format(idx))
+            raise IndexError("index {} is out of range".format(idx))
         idx %= size
         return next(islice(iterator, idx, None))
 
@@ -382,10 +437,10 @@ class Parallel(Module):
 
         # Example of using Parallel with OrderedDict
         model = nn.Parallel(OrderedDict([
-                  ('conv1', nn.Conv2d(1,20,5)),
-                  ('relu1', nn.ReLU()),
-                  ('conv2', nn.Conv2d(20,64,5)),
-                  ('relu2', nn.ReLU())
+                  ("conv1", nn.Conv2d(1,20,5)),
+                  ("relu1", nn.ReLU()),
+                  ("conv2", nn.Conv2d(20,64,5)),
+                  ("relu2", nn.ReLU())
                 ]))
     """
 
@@ -403,7 +458,7 @@ class Parallel(Module):
         size = len(self)
         idx = operator.index(idx)
         if not -size <= idx < size:
-            raise IndexError('index {} is out of range'.format(idx))
+            raise IndexError("index {} is out of range".format(idx))
         idx %= size
         return next(islice(iterator, idx, None))
 
@@ -452,7 +507,7 @@ class Parallel(Module):
 class CNN(Module):
     def __init__(self, 
                  channels: List[int] = required,
-                 operation: dict = {"name" : "Conv1d"},
+                 operation: dict = {"module" : "Conv1d"},
                  regularization: list = None,
                  regularize_extrema: bool = True,
                  preoperation: bool = False,
@@ -461,8 +516,8 @@ class CNN(Module):
         
         # Store inputs
         self.channels = channels
-        self.operation = utils.class_selector('utils.torch.nn',operation['name'])
-        self.operation_params = operation.get('arguments',{"kernel_size" : 3, "padding" : 1})
+        self.operation = utils.class_selector("utils.torch.nn",operation["module"])
+        self.operation_params = operation.get("arguments",{"kernel_size" : 3, "padding" : 1})
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
         self.preoperation = preoperation
@@ -471,8 +526,8 @@ class CNN(Module):
         self.operations = []
         for i in range(len(channels)-1):
             # Update parameters
-            self.operation_params['in_channels'] = channels[i]
-            self.operation_params['out_channels'] = channels[i+1]
+            self.operation_params["in_channels"] = channels[i]
+            self.operation_params["out_channels"] = channels[i+1]
             
             # Update regularization parameters
             if self.regularization:
@@ -510,7 +565,7 @@ class CNN(Module):
 class DNN(Module):
     def __init__(self, 
                  features: List[int] = required,
-                 operation: dict = {"name" : "Linear"},
+                 operation: dict = {"module" : "Linear"},
                  regularization: list = None,
                  regularize_extrema: bool = True,
                  preoperation: bool = False,
@@ -519,8 +574,8 @@ class DNN(Module):
         
         # Store inputs
         self.features = features
-        self.operation = utils.class_selector('utils.torch.nn',operation['name'])
-        self.operation_params = operation.get('arguments',{})
+        self.operation = utils.class_selector("utils.torch.nn",operation["module"])
+        self.operation_params = operation.get("arguments",{})
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
         self.preoperation = preoperation
@@ -529,8 +584,8 @@ class DNN(Module):
         self.operations = []
         for i in range(len(features)-1):
             # Update parameters
-            self.operation_params['in_features'] = features[i]
-            self.operation_params['out_features'] = features[i+1]
+            self.operation_params["in_features"] = features[i]
+            self.operation_params["out_features"] = features[i+1]
             
             # Update regularization parameters
             if self.regularization:
@@ -570,7 +625,7 @@ class Regularization(Module):
         super(Regularization, self).__init__()
         self.operations = []
         for i in range(len(operations)):
-            self.operations.append(utils.class_selector('utils.torch.nn',operations[i]['name'])(**operations[i].get('arguments',{})))
+            self.operations.append(utils.class_selector("utils.torch.nn",operations[i]["module"])(**operations[i].get("arguments",{})))
         self.operations = Sequential(*self.operations)
     
     def forward(self, x: Tensor) -> Tensor:
@@ -679,12 +734,12 @@ class UnFlatten(Module):
 #         self.normalization = False
 #         self.dropout = False
 
-#         if activation.get('name'):
-#             self.activation = utils.class_selector('utils.torch.activation', activation['name'])(**activation.get('arguments', {}))
-#         if normalization.get('name'):
-#             self.normalization = utils.class_selector('utils.torch.normalization', normalization['name'])(**normalization.get('arguments', {}))
-#         if dropout.get('name'):
-#             self.dropout = utils.class_selector('utils.torch.dropout', dropout['name'])(**dropout.get('arguments', {}))
+#         if activation.get("module"):
+#             self.activation = utils.class_selector("utils.torch.activation", activation["module"])(**activation.get("arguments", {}))
+#         if normalization.get("module"):
+#             self.normalization = utils.class_selector("utils.torch.normalization", normalization["module"])(**normalization.get("arguments", {}))
+#         if dropout.get("module"):
+#             self.dropout = utils.class_selector("utils.torch.dropout", dropout["module"])(**dropout.get("arguments", {}))
 
 #     def forward(self, x: Tensor) -> Tensor:
 #         if self.activation:
@@ -712,18 +767,18 @@ class PointWiseConv1d(Module):
         super(PointWiseConv1d, self).__init__()
 
         # Check required inputs
-        check_required(self, {'in_channels':in_channels, 'out_channels':out_channels})
+        check_required(self, {"in_channels":in_channels, "out_channels":out_channels})
 
         # Establish default inputs
-        kwargs['groups'] = 1
-        kwargs['kernel_size'] = 1
-        kwargs['padding'] = 0
+        kwargs["groups"] = 1
+        kwargs["kernel_size"] = 1
+        kwargs["padding"] = 0
 
         # Declare operation
         self.pointwise_conv = Conv1d(in_channels, out_channels, **kwargs)
 
         # Initialize weights values
-        initializer = utils.class_selector('torch.nn.init', kwargs.get('initializer','xavier_normal_'))
+        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
         initializer(self.pointwise_conv.weight)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -735,19 +790,19 @@ class DepthwiseConv1d(Module):
         super(DepthwiseConv1d, self).__init__()
 
         # Check required inputs
-        check_required(self, {'in_channels':in_channels, 'kernel_size':kernel_size})
+        check_required(self, {"in_channels":in_channels, "kernel_size":kernel_size})
         
         # Establish default inputs
-        kwargs['groups'] = in_channels
-        kwargs['padding'] = kwargs.get('padding', (kernel_size-1)//2)
-        if 'out_channels' in kwargs:
-            kwargs.pop('out_channels')
+        kwargs["groups"] = in_channels
+        kwargs["padding"] = kwargs.get("padding", (kernel_size-1)//2)
+        if "out_channels" in kwargs:
+            kwargs.pop("out_channels")
 
         # Declare operation
         self.depthwise_conv = Conv1d(in_channels, in_channels, kernel_size, **kwargs)
         
         # Initialize weights values
-        initializer = utils.class_selector('torch.nn.init', kwargs.get('initializer','xavier_normal_'))
+        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
         initializer(self.depthwise_conv.weight)
         
     def forward(self, x: Tensor) -> Tensor:
@@ -759,7 +814,7 @@ class SeparableConv1d(Module):
         super(SeparableConv1d, self).__init__()
         
         # Check required inputs
-        check_required(self, {'in_channels':in_channels,'out_channels':out_channels,'kernel_size':kernel_size})
+        check_required(self, {"in_channels":in_channels,"out_channels":out_channels,"kernel_size":kernel_size})
 
         # Declare operations
         self.depthwise_conv = DepthwiseConv1d(in_channels, kernel_size, **kwargs)
@@ -776,18 +831,18 @@ class PointWiseConvTranspose1d(Module):
         super(PointWiseConvTranspose1d, self).__init__()
 
         # Check required inputs
-        check_required(self, {'in_channels':in_channels,'out_channels':out_channels})
+        check_required(self, {"in_channels":in_channels,"out_channels":out_channels})
 
         # Establish default inputs
-        kwargs['groups'] = 1
-        kwargs['kernel_size'] = 1
-        kwargs['padding'] = 0
+        kwargs["groups"] = 1
+        kwargs["kernel_size"] = 1
+        kwargs["padding"] = 0
 
         # Declare operation
         self.pointwise_conv_transp = ConvTranspose1d(in_channels, out_channels, **kwargs)
 
         # Initialize weights values
-        initializer = utils.class_selector('torch.nn.init', kwargs.get('initializer','xavier_normal_'))
+        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
         initializer(self.pointwise_conv_transp.weight)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -799,19 +854,19 @@ class DepthwiseConvTranspose1d(Module):
         super(DepthwiseConvTranspose1d, self).__init__()
         
         # Check required inputs
-        check_required(self, {'in_channels':in_channels, 'kernel_size':kernel_size})
+        check_required(self, {"in_channels":in_channels, "kernel_size":kernel_size})
 
         # Establish default inputs
-        kwargs['groups'] = in_channels
-        kwargs['padding'] = kwargs.get('padding', (kernel_size-1)//2)
-        if 'out_channels' in kwargs:
-            kwargs.pop('out_channels')
+        kwargs["groups"] = in_channels
+        kwargs["padding"] = kwargs.get("padding", (kernel_size-1)//2)
+        if "out_channels" in kwargs:
+            kwargs.pop("out_channels")
         
         # Declare operation
         self.depthwise_conv_transp = ConvTranspose1d(in_channels, in_channels, kernel_size, **kwargs)
         
         # Initialize weights values
-        initializer = utils.class_selector('torch.nn.init', kwargs.get('initializer','xavier_normal_'))
+        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
         initializer(self.depthwise_conv_transp.weight)
         
     def forward(self, x: Tensor) -> Tensor:
@@ -843,11 +898,11 @@ class Residual(Module):
         super(Residual, self).__init__()
         
         # Check required inputs
-        check_required(self, {'in_channels':in_channels,'out_channels':out_channels,'kernel_size':kernel_size,'operation':operation,'repetitions':repetitions})
+        check_required(self, {"in_channels":in_channels,"out_channels":out_channels,"kernel_size":kernel_size,"operation":operation,"repetitions":repetitions})
 
         # Define operation to be performed
         self.repetitions = repetitions
-        self.operation = utils.class_selector('utils.torch.nn', operation)
+        self.operation = utils.class_selector("utils.torch.nn", operation)
 
         # Check number of repetitions is higher than 1 (otherwise why bother?)
         if repetitions < 1:
