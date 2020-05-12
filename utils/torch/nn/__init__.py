@@ -85,6 +85,7 @@ from torch.nn import Softmax2d
 from torch.nn import LogSoftmax
 from torch.nn import AdaptiveLogSoftmaxWithLoss
 from ._ops import Lambda
+from ._ops import Concatenate
 from ._ops import ModelGraph
 from ._ops import Sequential
 from ._ops import Parallel
