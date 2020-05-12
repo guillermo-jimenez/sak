@@ -14,6 +14,7 @@ from numpy import nan
 from torch import Tensor
 from torch import Size
 from torch import exp
+from torch import cat
 from torch import randn_like
 from torch.nn import Module
 from torch.nn import BatchNorm1d
@@ -141,6 +142,16 @@ class Lambda(Module):
         return self.lmbda(x, *self.args, **self.kwargs)
         
         
+class Concatenate(Module):
+    def __init__(self, dim: int = 1, *args, **kwargs):
+        super(Concatenate, self).__init__()
+        self.dim = dim
+        pass
+
+    def forward(self, *x_list: List[Tensor]) -> Tensor:
+        return cat(x_list, dim=self.dim)
+        
+        
 class ModelGraph(Module):
     r"""A model composer"""
 
@@ -222,10 +233,19 @@ class ModelGraph(Module):
                 # Sanity check
                 if "modules" not in structure:
                     raise ValueError("Missing module list of the structure")
-                    
+                
                 # Add all elements as children of the previous element in the series
+                inout = []
                 for j in range(len(structure["modules"])):
                     res = self.__compose(structure["modules"][j], node_father, acc_string + "_" + str(j+1) if acc_string != "" else str(j+1))
+                    
+                    # Add starting (j == 0) and ending (j == N-1) nodes to in/out list
+                    if j == 0:
+                        inout.append(res)
+                    elif j == len(structure["modules"])-1:
+                        inout.append(res)
+
+                    # Check composed node
                     if isinstance(res, tuple):
                         if j != len(structure["modules"])-1:
                             for r in res:
@@ -233,14 +253,23 @@ class ModelGraph(Module):
                     else:
                         self.graph.add_edge(node_father, res)
                     node_father = res
+                
+                # Return for case part of parallel
+                return inout
             # If the structure is parallel (No default here, absorved by last conditional)
             elif structure["type"].lower() == 'parallel': 
                 nodes = []
                 for j in range(len(structure["modules"])):
                     res = self.__compose(structure["modules"][j], node_father, acc_string + "_" + str(j+1) if acc_string != "" else str(j+1))
-                    nodes.append(res)
+                    
+                    # Check composed node
                     if res is not None:
-                        self.graph.add_edge(node_father, res)
+                        if isinstance(res,list): # Means output from series
+                            nodes.append(res[-1])
+                            self.graph.add_edge(node_father, res[0])
+                        else:
+                            nodes.append(res)
+                            self.graph.add_edge(node_father, res)
                 return tuple(nodes)
             else:
                 raise NotImplementedError(("Execution paths other than 'series' or 'parallel' " +
