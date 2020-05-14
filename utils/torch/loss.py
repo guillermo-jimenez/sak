@@ -54,7 +54,7 @@ class CompoundLoss:
         self.mappings = []
         
         for operation in json:
-            self.operations.append(utils.class_selector('utils.torch.loss',operation['name'])(**operation.get('arguments',{})))
+            self.operations.append(utils.class_selector('utils.torch.loss',operation['class'])(**operation.get('arguments',{})))
             self.weights.append(operation['weight'])
             self.mappings.append(operation['mapping'])
             

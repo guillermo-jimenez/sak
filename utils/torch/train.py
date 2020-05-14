@@ -29,7 +29,7 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
         for k in execution['augmentation']['types']:
             transforms.append(utils.class_selector('utils.torch.data.augmentation',k)(*execution['augmentation']['types'][k]))
             
-        augmentation = utils.class_selector('torchvision.transforms',execution['augmentation']['name'])(transforms, *execution['augmentation']['arguments'])
+        augmentation = utils.class_selector('torchvision.transforms',execution['augmentation']['class'])(transforms, *execution['augmentation']['arguments'])
 
     # Select iterator decorator
     train_type = 'Train' if model.training else 'Valid'

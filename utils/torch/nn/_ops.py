@@ -536,7 +536,7 @@ class Parallel(Module):
 class CNN(Module):
     def __init__(self, 
                  channels: List[int] = required,
-                 operation: dict = {"module" : "Conv1d"},
+                 operation: dict = {"class" : "Conv1d"},
                  regularization: list = None,
                  regularize_extrema: bool = True,
                  preoperation: bool = False,
@@ -545,7 +545,7 @@ class CNN(Module):
         
         # Store inputs
         self.channels = channels
-        self.operation = utils.class_selector("utils.torch.nn",operation["module"])
+        self.operation = utils.class_selector("utils.torch.nn",operation["class"])
         self.operation_params = operation.get("arguments",{"kernel_size" : 3, "padding" : 1})
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
@@ -594,7 +594,7 @@ class CNN(Module):
 class DNN(Module):
     def __init__(self, 
                  features: List[int] = required,
-                 operation: dict = {"module" : "Linear"},
+                 operation: dict = {"class" : "Linear"},
                  regularization: list = None,
                  regularize_extrema: bool = True,
                  preoperation: bool = False,
@@ -603,7 +603,7 @@ class DNN(Module):
         
         # Store inputs
         self.features = features
-        self.operation = utils.class_selector("utils.torch.nn",operation["module"])
+        self.operation = utils.class_selector("utils.torch.nn",operation["class"])
         self.operation_params = operation.get("arguments",{})
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
@@ -654,7 +654,7 @@ class Regularization(Module):
         super(Regularization, self).__init__()
         self.operations = []
         for i in range(len(operations)):
-            self.operations.append(utils.class_selector("utils.torch.nn",operations[i]["module"])(**operations[i].get("arguments",{})))
+            self.operations.append(utils.class_selector("utils.torch.nn",operations[i]["class"])(**operations[i].get("arguments",{})))
         self.operations = Sequential(*self.operations)
     
     def forward(self, x: Tensor) -> Tensor:

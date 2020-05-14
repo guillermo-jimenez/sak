@@ -18,6 +18,6 @@ def compose(structure: Any) -> torch.nn.Module:
             modules.append(compose(structure[i]))
         modules = utils.torch.nn.Sequential(*modules)
     else:
-        modules = utils.class_selector('utils.torch.nn',structure['name'])(**structure.get('arguments',{}))
+        modules = utils.class_selector('utils.torch.nn',structure['class'])(**structure.get('arguments',{}))
 
     return modules
