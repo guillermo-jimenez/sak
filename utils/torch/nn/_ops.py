@@ -7,8 +7,9 @@ from itertools import islice
 from typing import Any
 from typing import List
 from typing import Tuple
+from numpy import all
 from numpy import array
-from numpy import argsort
+from numpy import zeros
 from numpy import arange
 from numpy import nan
 from torch import Tensor
@@ -160,53 +161,63 @@ class ModelGraph(Module):
         
         # Initialize operation graph
         self.graph = networkx.DiGraph()
-        self.nested = json['type'].lower() == 'nested'
         
         # Make space for plausible function names
         # Initialize with default function
         
         # Compose network
-        if self.nested:
-            self.__function_list = [("forward","input")] 
-            self.graph.add_node("input", returns=False)
-            self.__return_order = []
-            self.__nested(json['modules'])
+        self.graph = networkx.DiGraph()
+
+        # Retrieve output list for forward function
+        self.__return_list = []
+        for function in json['functions']:
+            if function['name'] == 'forward':
+                self.__return_list += function['outputs']
+
+        # Add nodes to graph
+        for node in json['nodes']:
+            does_node_return = node['id'] in self.__return_list
+            self.graph.add_node(node['id'], returns=does_node_return)
+            self.add_module(node['id'], utils.class_selector('utils.torch.nn',node['class'])(**node.get('arguments',{})))
         
-            # Order returns
-            keys = [self.__return_order[i][0] for i in range(len(self.__return_order))]
-            order = [self.__return_order[i][1] for i in range(len(self.__return_order))]
-            keys = array(keys)[argsort(order)]
-            self.__return_order = dict(zip(keys,arange(keys.size)))        
+        # Add edges to graph
+        for edge_from, edge_to in json['edges']:
+            # Convert to tuples (list not acceptable as identifiers)
+            if isinstance(edge_from, list):
+                edge_from = tuple(edge_from)
+            if isinstance(edge_to, list):
+                edge_to = tuple(edge_to)
+
+            # Add edges between nodes
+            self.graph.add_edge(edge_from, edge_to)
+
+        # Set output computational flows
+        self.output_paths = {}
+        self.subgraphs = {}
+        for function in json['functions']:
+            # Retrieve paths
+            all_executions = []
+            subgraphs = []
             
-            # Initialize forward function
-            for (fname, starting_node) in self.__function_list:
-                setattr(self, fname, self.__set_fcn_nested(fname,starting_node))
-        else:
-            self.graph = networkx.DiGraph()
-
-            self.__return_order = []
-            for function in json['functions']:
-                if function['name'] == 'forward':
-                    self.__return_order += function['outputs']
-
-                setattr(self, function['name'], self.__set_fcn(function['name'],function['inputs'],function['outputs']))
-
-            for node in json['nodes']:
-                self.graph.add_node(node['id'], returns=node['id'] in self.__return_order)
-                self.add_module(node['id'], utils.class_selector('utils.torch.nn',node['class'])(**node.get('arguments',{})))
-
-            for edge_from, edge_to in json['edges']:
-                if isinstance(edge_from, list):
-                    edge_from = tuple(edge_from)
-                if isinstance(edge_to, list):
-                    edge_to = tuple(edge_to)
-
-                    for e_t in edge_to:
-                        self.graph.add_edge(edge_from, e_t)
-                        self.graph.add_edge(e_t,edge_to)
+            for output in function['outputs']:
+                if len(function['inputs']) > 1:
+                    raise NotImplementedError("Not yet implemented for more than one input per function")
                 else:
-                    self.graph.add_edge(edge_from, edge_to)
+                    input = function['inputs'][0]
+                
+                # 1. Determine all necessary nodes for that specific output
+                nodes_path = set([n for l in list(networkx.all_simple_paths(self.graph,input,output)) for n in l])
+                # 2. Obtain subgraph
+                subgraphs.append(self.graph.subgraph(nodes_path))
+                # 3. Order topologically the subset of nodes
+                all_executions.append(list(networkx.topological_sort(subgraphs[-1])))
+
+            self.subgraphs[function['name']] = subgraphs
+            self.output_paths[function['name']] = all_executions
             
+            # Set function
+            setattr(self, function['name'], self.compose(function['name'],function['inputs'],function['outputs']))
+
         
     def _get_item_by_idx(self, iterator, idx):
         """Get the idx-th item of the iterator"""
@@ -252,201 +263,83 @@ class ModelGraph(Module):
     def __iter__(self):
         return iter(self._modules.values())
         
-    def __nested(self, structure, node_father = "input", acc_string = ""):
-        # Marks start of a structure (series, parallel)
-        if ("type" in structure) or ("modules" in structure):
-            # If structure type is series:
-            if structure.get("type","series").lower() == 'series':
-                # Sanity check
-                if "modules" not in structure:
-                    raise ValueError("Missing module list of the structure")
-                
-                # Add all elements as children of the previous element in the series
-                inout = []
-                for j in range(len(structure["modules"])):
-                    res = self.__nested(structure["modules"][j], node_father, acc_string + "_" + str(j+1) if acc_string != "" else str(j+1))
-                    
-                    # Add starting (j == 0) and ending (j == N-1) nodes to in/out list
-                    if j == 0:
-                        inout.append(res)
-                    elif j == len(structure["modules"])-1:
-                        inout.append(res)
-
-                    # Check composed node
-                    if isinstance(res, tuple):
-                        if j != len(structure["modules"])-1:
-                            for r in res:
-                                self.graph.add_edge(r, res)
-                    else:
-                        self.graph.add_edge(node_father, res)
-                    node_father = res
-                
-                # Return for case part of parallel
-                return inout
-            # If the structure is parallel (No default here, absorved by last conditional)
-            elif structure["type"].lower() == 'parallel': 
-                nodes = []
-                for j in range(len(structure["modules"])):
-                    res = self.__nested(structure["modules"][j], node_father, acc_string + "_" + str(j+1) if acc_string != "" else str(j+1))
-                    
-                    # Check composed node
-                    if res is not None:
-                        if isinstance(res,list): # Means output from series
-                            nodes.append(res[-1])
-                            self.graph.add_edge(node_father, res[0])
-                        else:
-                            nodes.append(res)
-                            self.graph.add_edge(node_father, res)
-                return tuple(nodes)
-            else:
-                raise NotImplementedError(("Execution paths other than 'series' or 'parallel' " +
-                                            "are not yet implemented. Inputted {}.".format(structure[0])))
-        # Else is an operation
-        else:
-            # Sanity check: did not include tuples or lists
-            if isinstance(structure, tuple) or isinstance(structure, list):
-                raise ValueError("Beware, module contains nested list. Refer to API")
-            
-            # Add executable torch.nn.Module (must have "forward" function implemented) to pile
-            self.add_module(structure.get('id',acc_string), utils.class_selector('utils.torch.nn',structure['class'])(**structure.get('arguments',{})))
-            
-            # Add module information to execution graph
-            self.graph.add_node(structure.get('id',acc_string), returns=structure.get('returns',False))
-            
-            # Check if returns anything
-            if structure.get('returns',False):
-                self.__return_order.append((structure.get('id',acc_string),structure.get('order',nan)))
-                
-            # Check if it needs its own execution function
-            if structure.get('function',False):
-                self.__function_list.append((structure.get('function'),structure.get('id',acc_string)))
-            
-            # Return node id
-            return structure.get('id',acc_string)
-
     # Function maker for all plausible addable functions
-    def __set_fcn(self,name,start_node,end_nodes):
+    def compose(self,name,start_nodes,end_nodes):
         # Retrieve function call with provided name. Static 
         # starting node (hence the difference between calls)
         # List end nodes as array (for comparison)
+        if isinstance(start_nodes, list):
+            start_nodes = tuple(start_nodes)
         if isinstance(end_nodes,list):
             end_nodes = array(end_nodes)
         else:
             end_nodes = array([end_nodes])
         
-        def call(input: Tensor) -> Tuple[Tensor]:
-            # Store input in partial computation
-            partial = {start_node : input}
-            is_end_node = zeros((len(end_nodes),),dtype=bool)
-            output = [None for _ in is_end_node.size]
-            
-            # Check if "input" node is starting node (should be a 
-            # better way with the graph, but little overhead anyway)
-            is_start_node = False
-            for node_from, nodes_to in self.graph.adjacency():
-                # Check if it is starting node (should be a better
-                # way with the graph, but little overhead anyway)
-                if not is_start_node: 
-                    if (node_from != start_node):
-                        continue
-                    else:
-                        is_start_node = True
-                
-                # If all nodes have been computed, break
-                if all(is_end_node):
-                    break
-                
-                # Retrieve input. Enclose in tuple to avoid splitting in tensor axes
-                if isinstance(node_from, tuple):
-                    x = []
-                    for n in node_from:
-                        x.append(partial[n])
-                    x = tuple(x)
-                else:
-                    x = (partial[node_from],)
+        # Retrieve execution information
+        all_executions = self.output_paths[name]
+        subgraphs = self.subgraphs[name]
 
-                # Compute output
-                for n in nodes_to:
+        def call(input: Tensor) -> Tuple[Tensor]:
+            # Iterate over paths
+            partial = {'input': input}
+            output = [None for _ in range(len(end_nodes))]
+            
+            # Iterate over all assigned outputs
+            for i in range(len(all_executions)):
+                execution_order = all_executions[i]
+                subgraph = subgraphs[i]
+
+                # Iterate over execution graph output node
+                for j in range(len(execution_order)):
+                    node_to = execution_order[j]
+                    # Check if node_to has already been computed
+                    if node_to in partial:
+                        continue
+                    
+                    # Check all nodes, ordered topologically
+                    nodes_from = tuple(subgraph.predecessors(node_to))
+                    if len(nodes_from) == 0:
+                        nodes_from = 'input'
+                    elif len(nodes_from) == 1:
+                        nodes_from = nodes_from[0]
+
+                    # Prepare inputs
+                    if isinstance(nodes_from, tuple):
+                        x = []
+                        for n in nodes_from:
+                            x.append(partial[n])
+                        x = tuple(x)
+                    else:
+                        x = (partial[nodes_from],)
+
+                    # Compute output
                     # If node_to is tuple, merging point of parallel
                     # branches (no operation to be performed in that case)
-                    if not isinstance(n, tuple):
-                        partial[n] = self[n](*x)
-                        
-                        # Check if it's a terminal node
-                        if n in end_nodes:
-                            is_end_node[end_nodes == n] = True
-                            output[end_nodes == n] = partial[n]
+                    if not isinstance(node_to, tuple):
+                        partial[node_to] = self[node_to](*x)
+
+                # The last node computed is always a terminal node, and is added to the output list
+                output[argmax(end_nodes == node_to)] = partial[node_to]
             
             # Return output as a tuple
             return tuple(output)
         
         return call
-        # setattr(self, name, call)
-        
-    # Function maker for all plausible addable functions
-    def __set_fcn_nested(self,name,start_node):
-        # Retrieve function call with provided name. Static 
-        # starting node (hence the difference between calls)
-        def call(input: Tensor) -> Tuple[Tensor]:
-            # Store input in partial computation
-            partial = {start_node : input}
-            
-            # Check if "input" node is starting node (should be a 
-            # better way with the graph, but little overhead anyway)
-            is_start_node = False
-            for node_from, nodes_to in self.graph.adjacency():
-                # Check if it is starting node (should be a better
-                # way with the graph, but little overhead anyway)
-                if not is_start_node: 
-                    if (node_from != start_node):
-                        continue
-                    else:
-                        is_start_node = True
-                
-                # Retrieve input. Enclose in tuple to avoid splitting in tensor axes
-                if isinstance(node_from, tuple):
-                    x = []
-                    for n in node_from:
-                        x.append(partial[n])
-                    x = tuple(x)
-                else:
-                    x = (partial[node_from],)
-
-                # Compute output
-                for n in nodes_to:
-                    # If node_to is tuple, merging point of parallel
-                    # branches (no operation to be performed in that case)
-                    if not isinstance(n, tuple):
-                        partial[n] = self[n](*x)
-            
-            # Declare outputs (vector of nan in case no return)
-            output = [nan for _ in range(len(self.__return_order))]
-            
-            # Retrieve the nodes marked as outputs into the structure
-            for n in partial:
-                if self.graph.nodes[n]['returns']:
-                    output[self.__return_order[n]] = partial[n]
-            
-            # Return output as a tuple
-            return tuple(output)
-        
-        return call
-        # setattr(self, name, call)
         
     def draw_networkx(self, ):
         try: # In case graphviz is installed (mostly for my own use)
             pos = networkx.drawing.nx_agraph.graphviz_layout(self.graph)
         except (NameError, ModuleNotFoundError, ImportError) as e:
             pos = networkx.drawing.layout.planar_layout(self.graph)
-
+            
         networkx.draw_networkx_nodes(self.graph, pos,
-                            nodelist=self.__return_order,
+                            nodelist=self.__return_list,
                             node_color='r')
         networkx.draw_networkx_nodes(self.graph, pos,
-                            nodelist=[n for n in self.graph.nodes if n not in self.__return_order],
+                            nodelist=[n for n in list(self.graph.nodes) if n not in self.__return_list],
                             node_color='b')
         networkx.draw_networkx_edges(self.graph, pos, width=1.0, alpha=0.5)
-        networkx.draw_networkx_labels(self.graph, pos, dict(zip(self.graph.nodes.keys(),self.graph.nodes.keys())), font_size=16)
+        networkx.draw_networkx_labels(self.graph, pos, dict(zip(list(self.graph.nodes.keys()),list(self.graph.nodes.keys()))), font_size=16)
 
 
 class Sequential(Module):
