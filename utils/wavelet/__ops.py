@@ -78,7 +78,7 @@ def qspfilt5(fs: float) -> Tuple[np.ndarray,np.ndarray,np.ndarray,np.ndarray,np.
             q3 = q3[5:-4:5]
             q4 = q4[2:-4:5]
             q5 = q5[2:-4:5]
-        if fs == 360.:
+        elif fs == 360.:
             (q1,_) = interp(np.concatenate(([0],q[0],[0])),6,1)
             (q2,_) = interp(np.concatenate(([0],q[1],[0])),6,3)
             (q3,_) = interp(np.concatenate(([0],q[2],[0])),6,7)
@@ -99,7 +99,7 @@ def qspfilt5(fs: float) -> Tuple[np.ndarray,np.ndarray,np.ndarray,np.ndarray,np.
             q3 = q3[4:-6:5]
             q4 = q4[4:-6:5]
             q5 = q5[4:-6:5]
-        if fs == 500.:
+        elif fs == 500.:
             (q1,_) = interp(np.concatenate(([0],q[0],[0])),2,1)
             (q2,_) = interp(np.concatenate(([0],q[1],[0])),2,3)
             (q3,_) = interp(np.concatenate(([0],q[2],[0])),2,7)
@@ -110,7 +110,7 @@ def qspfilt5(fs: float) -> Tuple[np.ndarray,np.ndarray,np.ndarray,np.ndarray,np.
             q3 = q3[1:-2]
             q4 = q4[1:-2]
             q5 = q5[1:-2]
-        if fs == 1000.:
+        elif fs == 1000.:
             (q1,_) = interp(np.concatenate(([0],q[0],[0])),4,1)
             (q2,_) = interp(np.concatenate(([0],q[1],[0])),4,3)
             (q3,_) = interp(np.concatenate(([0],q[2],[0])),4,7)
@@ -123,6 +123,8 @@ def qspfilt5(fs: float) -> Tuple[np.ndarray,np.ndarray,np.ndarray,np.ndarray,np.
             q5 = q5[1:-4]
         else:
             raise NotImplementedError("Frequencies outside [200,250,360,500,1000] Hz not supported.")
+    else:
+        (q1,q2,q3,q4,q5) = q
             
     return q1,q2,q3,q4,q5
 
