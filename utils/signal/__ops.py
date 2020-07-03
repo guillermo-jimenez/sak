@@ -4,6 +4,15 @@ import numpy as np
 
 StandardHeader = np.array(['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'])
 
+def get_mask_boundary(binary_mask: np.ndarray, axis=-1) -> Tuple[list,list]:
+    binary_mask = binary_mask.astype(int)
+    diff = np.diff(np.pad(binary_mask,((1,1),),'constant',constant_values=0),axis=axis)
+
+    onsets = (np.where(diff ==  1.)[0]).tolist()
+    offsets = (np.where(diff == -1.)[0] - 1).tolist()
+    
+    return onsets, offsets
+
 def flatten_along_axis(X: np.ndarray, axis: int = None):
     if axis != None:
         X = X.reshape((X.shape[axis], np.prod(np.delete(X.shape,axis))))
