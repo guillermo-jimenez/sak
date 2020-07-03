@@ -5,8 +5,6 @@ import matplotlib.pyplot as plt
 from matplotlib.figure import Figure
 
 
-TemplateHeader = ['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6']
-
 def N_leads(
         x: np.ndarray, 
         y: np.ndarray = None, 
@@ -67,7 +65,10 @@ def standard(
     if x.shape[0] != y.shape[0]:
         raise ValueError("x and y vectors inputted with different shapes '{}' and '{}'".format(x.shape[0],y.shape[0]))
 
-    fig,ax = plt.subplots(nrows = 6, ncols = 2, figsize=(4,12),**kwargs)
+    # Set default values
+    kwargs['figsize'] = kwargs.get('figsize', (4,12))
+
+    fig,ax = plt.subplots(nrows = 6, ncols = 2, **kwargs)
     [ax[i,0].set_facecolor([0.1,0.8,0,0.1]) for i in range(3)]
     [ax[i,0].set_facecolor([1,0.3,1,0.1]) for i in range(3,6)]
     [ax[i,1].set_facecolor([1,0,0,0.1]) for i in range(6)]
@@ -80,7 +81,7 @@ def standard(
         [ax[i%6][i//6].set_title(header[i]) for i in range(len(header))]
 
     # Set limits
-    [[ax[i,j].set_xlim([0,x.shape[0]]) for j in range(ax.shape[1])] for i in range(ax.shape[0])]
+    [[ax[i,j].set_xlim([x[0],x[-1]]) for j in range(ax.shape[1])] for i in range(ax.shape[0])]
 
     if returns:
         return fig,ax
