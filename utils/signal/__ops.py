@@ -1,6 +1,7 @@
 from typing import List
 from typing import Tuple
 import numpy as np
+from skimage.util import view_as_windows
 
 StandardHeader = np.array(['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'])
 
@@ -85,7 +86,7 @@ def negative_zero_crossings(X: np.ndarray) -> List[np.ndarray]:
     # X = ordering_N_lead(X)
     return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])) > 0)[0] for j in range(X.shape[1])]
 
-def xcorr(x: np.ndarray, y: np.ndarray, normed: bool = True, maxlags: int = None) -> List[np.ndarray]:
+def xcorr(x: np.ndarray, y: np.ndarray = None, normed: bool = True, maxlags: int = None) -> List[np.ndarray]:
     # Cross correlation of two signals of equal length
     # Returns the coefficients when normed=True
     # Returns inner products when normed=False
@@ -93,15 +94,19 @@ def xcorr(x: np.ndarray, y: np.ndarray, normed: bool = True, maxlags: int = None
     # Optional detrending e.g. mlab.detrend_mean
 
     # Order dimensions of both vectors
-    if (x.ndim == 2) or (y.ndim == 2):
-        return [__xcorr_aux(x[:,j],y[:,j],normed,maxlags) for j in range(x.shape[1])]
+    if y is not None:
+        if (x.ndim == 2) or (y.ndim == 2):
+            return [__xcorr_single(x[:,j],y[:,j],normed,maxlags) for j in range(x.shape[1])]
+        else:
+            x = x.squeeze()
+            y = y.squeeze()
+            return __xcorr_single(x,y,normed,maxlags)
     else:
-        x = x.squeeze()
-        y = y.squeeze()
-        return __xcorr_aux(x,y,normed,maxlags)
+        return __xcorr_matrix(x, normed, maxlags)
 
 
-def __xcorr_aux(x: np.ndarray, y: np.ndarray, normed: bool, maxlags: int) -> Tuple[np.ndarray, np.ndarray]:
+
+def __xcorr_single(x: np.ndarray, y: np.ndarray, normed: bool, maxlags: int) -> Tuple[np.ndarray, np.ndarray]:
     # Check dimensions
     Nx = x.shape[0]
     if Nx != y.shape[0]:
@@ -119,7 +124,39 @@ def __xcorr_aux(x: np.ndarray, y: np.ndarray, normed: bool, maxlags: int) -> Tup
     if maxlags >= Nx or maxlags < 1:
         raise ValueError('maglags must be None or strictly '
                          'positive < %d' % Nx)
-
+    
     lags = np.arange(-maxlags, maxlags + 1)
     c = c[Nx - 1 - maxlags:Nx + maxlags]
     return c, lags
+
+
+def __xcorr_matrix(matrix, normed, maxlags):
+    # Initial checks
+    if matrix.ndim != 2:
+        raise ValueError("prepared for 2D inputs")
+    if matrix.shape[0] < 1:
+        raise ValueError("Minimum of 2 samples needed")
+        
+    # Retrieve shape
+    n,s = matrix.shape
+
+    # Pad input
+    matrix_padded = np.pad(matrix,((0,0),(s-1,s-1)),constant_values=0)
+    matrix_padded = view_as_windows(matrix_padded,(1,matrix.shape[-1],)).squeeze()
+
+    lags = np.arange(-matrix.shape[-1]+1,matrix.shape[-1])
+    if maxlags and (maxlags < matrix.shape[-1]) and (maxlags > 0):
+        filt = (lags > -maxlags+1) & (lags < maxlags)
+        lags = lags[filt]
+        matrix_padded = matrix_padded[:,filt,:]
+        
+    # Elementwise multiplications across all elements in axis=0, 
+    # and then summation along axis=1
+    out = np.einsum('ijkl,ijkl->ijk',matrix_padded[None,:,:,:],matrix_padded[:,None,:,:])
+    if normed:
+        norm_x = np.einsum('ijk,ijk->ij',matrix[:,None,:],matrix[:,None,:])
+        norm = np.sqrt(norm_x*norm_x.T)
+        out = np.true_divide(out,norm[...,None])
+
+    # Use valid mask to skip columns and have the final output
+    return out, lags
