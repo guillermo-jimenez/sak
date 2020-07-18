@@ -11,6 +11,7 @@ from numpy import all
 from numpy import array
 from numpy import zeros
 from numpy import arange
+from numpy import argmax
 from numpy import nan
 from torch import Tensor
 from torch import Size
@@ -132,27 +133,6 @@ def update_regularization(regularization_list: list = required, network_params: 
     return regularization_list
         
     
-class Lambda(Module):
-    def __init__(self, lmbda, *args, **kwargs):
-        super(Lambda, self).__init__()
-        self.lmbda = lmbda
-        self.args = args
-        self.kwargs = kwargs
-
-    def forward(self, x: Tensor) -> Tensor:
-        return self.lmbda(x, *self.args, **self.kwargs)
-        
-        
-class Concatenate(Module):
-    def __init__(self, dim: int = 1, *args, **kwargs):
-        super(Concatenate, self).__init__()
-        self.dim = dim
-        pass
-
-    def forward(self, *x_list: List[Tensor]) -> Tensor:
-        return cat(x_list, dim=self.dim)
-        
-        
 class ModelGraph(Module):
     r"""A model composer"""
 
@@ -512,6 +492,27 @@ class Parallel(Module):
         return tuple(output)
 
 
+class Lambda(Module):
+    def __init__(self, lmbda, *args, **kwargs):
+        super(Lambda, self).__init__()
+        self.lmbda = lmbda
+        self.args = args
+        self.kwargs = kwargs
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.lmbda(x, *self.args, **self.kwargs)
+        
+        
+class Concatenate(Module):
+    def __init__(self, dim: int = 1, *args, **kwargs):
+        super(Concatenate, self).__init__()
+        self.dim = dim
+        pass
+
+    def forward(self, *x_list: List[Tensor]) -> Tensor:
+        return cat(x_list, dim=self.dim)
+        
+        
 class CNN(Module):
     def __init__(self, 
                  channels: List[int] = required,
@@ -754,17 +755,6 @@ class UnFlatten(Module):
 
     def forward(self, x: Tensor) -> Tensor:
         return x.view(x.shape[0], *self.shape)
-
-
-class GlobalAvgPooling1d(Module):
-    def __init__(self, dim: int = None, keepdims: bool = False):
-        super(GlobalAvgPooling1d, self).__init__()
-
-        self.dim = dim
-        self.keepdims = keepdims
-
-    def forward(self, x: Tensor) -> Tensor:
-        return x.mean(self.dim, self.keepdims)
 
 
 class PointWiseConv1d(Module):
