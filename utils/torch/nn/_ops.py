@@ -139,12 +139,6 @@ class ModelGraph(Module):
     def __init__(self, json):
         super(ModelGraph, self).__init__()
         
-        # Initialize operation graph
-        self.graph = networkx.DiGraph()
-        
-        # Make space for plausible function names
-        # Initialize with default function
-        
         # Compose network
         self.graph = networkx.DiGraph()
 
