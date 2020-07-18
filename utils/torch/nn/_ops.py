@@ -757,6 +757,20 @@ class UnFlatten(Module):
         return x.view(x.shape[0], *self.shape)
 
 
+class ImagePooling1d(nn.Sequential):
+    def __init__(self, in_channels, out_channels):
+        super(ImagePooling1d, self).__init__(
+            nn.AdaptiveAvgPool1d(1),
+            nn.SeparableConv1d(in_channels, out_channels, 1, bias=False),
+            nn.BatchNorm1d(out_channels),
+            nn.ReLU(inplace=True))
+
+    def forward(self, x):
+        size = x.shape[2:]
+        x = super(ImagePooling1d, self).forward(x)
+        return F.interpolate(x.unsqueeze(-1), size=(*size,1), mode='bilinear', align_corners=False).squeeze(-1)
+    
+
 class PointWiseConv1d(Module):
     def __init__(self, in_channels: int = required, out_channels: int = required, **kwargs: dict):
         super(PointWiseConv1d, self).__init__()
