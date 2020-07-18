@@ -758,12 +758,15 @@ class UnFlatten(Module):
 
 
 class ImagePooling1d(nn.Sequential):
-    def __init__(self, in_channels, out_channels):
+    def __init__(self, in_channels: int = required, out_channels: int = required):
         super(ImagePooling1d, self).__init__(
             nn.AdaptiveAvgPool1d(1),
             nn.SeparableConv1d(in_channels, out_channels, 1, bias=False),
             nn.BatchNorm1d(out_channels),
             nn.ReLU(inplace=True))
+
+        # Check required inputs
+        check_required(self, {"in_channels":in_channels, "out_channels":out_channels})
 
     def forward(self, x):
         size = x.shape[2:]
