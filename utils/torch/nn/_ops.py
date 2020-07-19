@@ -191,7 +191,8 @@ class ModelGraph(Module):
             self.output_paths[function['name']] = all_executions
             
             # Set function
-            setattr(self, function['name'], self.compose(function['name'],function['inputs'],function['outputs']))
+            # setattr(self, function['name'], self.compose(function['name'],function['inputs'],function['outputs']))
+            self.compose(function['name'],function['inputs'],function['outputs'])
 
         
     def _get_item_by_idx(self, iterator, idx):
@@ -298,7 +299,8 @@ class ModelGraph(Module):
             
             # Return output as a tuple
             return tuple(output)
-        return call
+        # return call
+        setattr(self, name, call)
         
     def draw_networkx(self, ):
         try: # In case graphviz is installed (mostly for my own use)
