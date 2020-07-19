@@ -3,6 +3,7 @@ from typing import Tuple
 from typing import List
 from typing import Callable
 import os
+import dill
 import os.path
 import shutil
 import tqdm
@@ -111,10 +112,8 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             if 'scheduler' in state:
                 state['scheduler'].step(state['loss_validation'])
 
-            # Checkpoint model when best performance
-            state['model_state_dict'] = model.state_dict()
-            
-            # Save model info
+            # Save model/state info
+            torch.save(model, os.path.join(execution['save_directory'],'checkpoint.model'), pickle_module=dill)
             utils.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
             
             # Check if loss is best loss
@@ -123,11 +122,14 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
                 state['best_epoch'] = epoch
                 
                 # Copy checkpoint and mark as best
+                shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.model'), os.path.join(execution['save_directory'],'model_best.model'))
                 shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.state'), os.path.join(execution['save_directory'],'model_best.state'))
             
         except KeyboardInterrupt:
+            torch.save(model, os.path.join(execution['save_directory'],'keyboard_interrupt.model'), pickle_module=dill)
             utils.pickledump(state, os.path.join(execution['save_directory'],'keyboard_interrupt.state'), mode='wb')
             raise
         except:
+            torch.save(model, os.path.join(execution['save_directory'],'error.model'), pickle_module=dill)
             utils.pickledump(state, os.path.join(execution['save_directory'],'error.state'), mode='wb')
             raise
