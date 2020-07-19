@@ -100,7 +100,6 @@ from ._ops import Squeeze
 from ._ops import Unsqueeze
 from ._ops import View
 from ._ops import UnFlatten
-from ._ops import GlobalAvgPooling1d
 from ._ops import PointWiseConv1d
 from ._ops import DepthwiseConv1d
 from ._ops import SeparableConv1d

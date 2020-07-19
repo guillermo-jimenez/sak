@@ -104,6 +104,7 @@ from torch.nn import Softmax
 from torch.nn import Softmax2d
 from torch.nn import LogSoftmax
 from torch.nn import AdaptiveLogSoftmaxWithLoss
+from torch.nn.functional import interpolate
 from utils.__ops import required
 from utils.__ops import check_required
 
@@ -182,7 +183,7 @@ class ModelGraph(Module):
                 # 1. Determine all necessary nodes for that specific output
                 nodes_path = set([n for l in list(networkx.all_simple_paths(self.graph,input,output)) for n in l])
                 # 2. Obtain subgraph
-                subgraphs.append(self.graph.subgraph(nodes_path))
+                subgraphs.append(networkx.DiGraph(self.graph.subgraph(nodes_path)))
                 # 3. Order topologically the subset of nodes
                 all_executions.append(list(networkx.topological_sort(subgraphs[-1])))
 
@@ -297,7 +298,6 @@ class ModelGraph(Module):
             
             # Return output as a tuple
             return tuple(output)
-        
         return call
         
     def draw_networkx(self, ):
@@ -751,13 +751,13 @@ class UnFlatten(Module):
         return x.view(x.shape[0], *self.shape)
 
 
-class ImagePooling1d(nn.Sequential):
+class ImagePooling1d(Sequential):
     def __init__(self, in_channels: int = required, out_channels: int = required):
         super(ImagePooling1d, self).__init__(
-            nn.AdaptiveAvgPool1d(1),
-            nn.SeparableConv1d(in_channels, out_channels, 1, bias=False),
-            nn.BatchNorm1d(out_channels),
-            nn.ReLU(inplace=True))
+            AdaptiveAvgPool1d(1),
+            SeparableConv1d(in_channels, out_channels, 1, bias=False),
+            BatchNorm1d(out_channels),
+            ReLU(inplace=True))
 
         # Check required inputs
         check_required(self, {"in_channels":in_channels, "out_channels":out_channels})
@@ -765,7 +765,7 @@ class ImagePooling1d(nn.Sequential):
     def forward(self, x):
         size = x.shape[2:]
         x = super(ImagePooling1d, self).forward(x)
-        return F.interpolate(x.unsqueeze(-1), size=(*size,1), mode='bilinear', align_corners=False).squeeze(-1)
+        return interpolate(x.unsqueeze(-1), size=(*size,1), mode='bilinear', align_corners=False).squeeze(-1)
     
 
 class PointWiseConv1d(Module):
