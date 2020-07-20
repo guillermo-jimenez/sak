@@ -57,14 +57,14 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
         out = (out,) if not isinstance(out, tuple) else out
 
         # Calculate loss
-        loss = criterion((X,y),out)
+        loss = criterion(X,y,*out)
 
         # Break early
         if torch.isnan(loss):
             raise ValueError("Nan loss value encountered. Stopping...")
 
         # Retrieve for printing purposes
-        print_loss = metric((X,y),out) if metric is not None else loss.item()
+        print_loss = metric(X,y,*out) if metric is not None else loss.item()
         
         # Optimize network's weights
         if model.training:
