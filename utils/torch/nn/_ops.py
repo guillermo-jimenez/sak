@@ -755,19 +755,23 @@ class UnFlatten(Module):
 
 class ImagePooling1d(Sequential):
     def __init__(self, in_channels: int = required, out_channels: int = required):
-        super(ImagePooling1d, self).__init__(
-            AdaptiveAvgPool1d(1),
-            SeparableConv1d(in_channels, out_channels, 1, bias=False),
-            BatchNorm1d(out_channels),
-            ReLU(inplace=True))
+        super(ImagePooling1d, self).__init__()
+        self.pooling = AdaptiveAvgPool1d(1)
+        self.convolution = SeparableConv1d(in_channels, out_channels, 1, bias=False)
+        self.batchnorm = BatchNorm1d(out_channels)
+        self.relu = ReLU(inplace=True)
 
         # Check required inputs
         check_required(self, {"in_channels":in_channels, "out_channels":out_channels})
 
     def forward(self, x):
         size = x.shape[2:]
-        x = super(ImagePooling1d, self).forward(x)
-        return interpolate(x.unsqueeze(-1), size=(*size,1), mode='bilinear', align_corners=False).squeeze(-1)
+        x = self.pooling(x)
+        x = self.convolution(x)
+        x = self.batchnorm(x)
+        x = self.relu(x)
+        x = interpolate(x.unsqueeze(-1), size=(*size,1), mode='bilinear', align_corners=False).squeeze(-1)
+        return x
     
 
 class PointWiseConv1d(Module):
