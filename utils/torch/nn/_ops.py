@@ -635,7 +635,8 @@ class Regularization(Module):
     
     def forward(self, x: Tensor) -> Tensor:
         return self.operations(x)
-        
+
+
 class Reparameterize(Module):
     def __init__(self, *args, **kwargs):
         super(Reparameterize, self).__init__()
@@ -645,6 +646,7 @@ class Reparameterize(Module):
         std = exp(0.5*logvar)
         eps = randn_like(std)
         return mu + eps*std
+
 
 class none(Module):
     """Does nothing apply dropout"""
@@ -772,7 +774,7 @@ class ImagePooling1d(Sequential):
         x = self.relu(x)
         x = interpolate(x.unsqueeze(-1), size=(*size,1), mode='bilinear', align_corners=False).squeeze(-1)
         return x
-    
+
 
 class PointWiseConv1d(Module):
     def __init__(self, in_channels: int = required, out_channels: int = required, **kwargs: dict):
