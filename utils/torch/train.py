@@ -38,7 +38,6 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
 
     # Iterate over all data in train/validation/test dataloader:
     print_loss = np.inf
-    loss = 0
     for i, (X, y) in enumerate(iterator):
         # # Apply data augmentation
         if model.training and ('augmentation' in execution):
@@ -72,12 +71,12 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
             state['optimizer'].step()
 
         # Accumulate losses
-        batch_loss[i] += print_loss
+        batch_loss[i] = print_loss
 
         # Change iterator description
         if isinstance(iterator,tqdm.tqdm):
             iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], print_loss))
-        
+
     if isinstance(iterator, tqdm.tqdm):
         iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.mean(batch_loss)))
 
