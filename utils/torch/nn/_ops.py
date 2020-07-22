@@ -955,11 +955,12 @@ class Dropout1d(Module):
         if (p < 0) or (p > 1):
             raise ValueError("Invalid probability {} provided. Must be formatted in range [0,1]".format(p))
         self.p = p
+        self.dropout = Dropout2d(self.p)
     
     def forward(self, x: Tensor) -> Tensor:
         # add a dimension for 2D to work -> format BxCxHxW
         x = x.unsqueeze(-1) 
-        x = Dropout2d(self.p)(x).squeeze(-1)
+        x = self.dropout(x).squeeze(-1)
         return x
 
 
