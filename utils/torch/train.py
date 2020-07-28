@@ -116,8 +116,9 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             utils.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
             
             # Check if loss is best loss
-            if ((smaller) and (state['loss_validation'] < state['best_loss'])) or ((not smaller) and (state['loss_validation'] > state['best_loss'])):
-                state['best_loss'] = state['loss_validation']
+            compound_loss = 2*state['loss_train']*state['loss_validation']/(state['loss_train']+state['loss_validation'])
+            if ((smaller) and (compound_loss < state['best_loss'])) or ((not smaller) and (compound_loss > state['best_loss'])):
+                state['best_loss'] = compound_loss
                 state['best_epoch'] = epoch
                 
                 # Copy checkpoint and mark as best
