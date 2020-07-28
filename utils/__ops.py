@@ -3,6 +3,9 @@ import numpy as np
 import pickle
 import importlib
 
+def map_upper(lst: list) -> list:
+    return list(map(str.upper,lst))
+
 def check_header(header):
     header = list(map(str.upper,header))
     header = np.array(header).squeeze()
