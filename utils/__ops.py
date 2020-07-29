@@ -68,7 +68,7 @@ def pickleload(file: str, mode: str = 'rb') -> Any:
 
 def class_selector(module_name: str, class_name: str):
     # load the module, will raise ImportError if module cannot be loaded
-    if class_name is 'None':
+    if class_name == 'None':
         class_name = class_name.lower()
     m = importlib.import_module(module_name)
     # return the class, will raise AttributeError if class cannot be found
