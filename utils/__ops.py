@@ -3,6 +3,31 @@ import numpy as np
 import pickle
 import importlib
 
+# Data loader to un-clutter code    
+def load_data(filepath):
+    dic = dict()
+    with open(filepath) as f:
+        text = list(f)
+    for line in text:
+        line = line.replace(' ','').replace('\n','').replace(',,','')
+        if line[-1] == ',': line = line[:-1]
+        head = line.split(',')[0]
+        tail = line.split(',')[1:]
+        if tail == ['']:
+            tail = np.asarray([])
+        else:
+            tail = np.asarray(tail).astype(int)
+
+        dic[head] = tail
+    return dic
+
+# Data loader to un-clutter code    
+def save_data(filepath, dic):
+    with open(filepath, 'w') as f:
+        for key in dic.keys():
+            # f.write("%s,%s\n"%(key,dic[key].tolist()))
+            f.write("{},{}\n".format(key,str(dic[key].tolist()).replace(']','').replace('[','').replace(' ','')))
+
 def map_upper(lst: list) -> list:
     return list(map(str.upper,lst))
 
