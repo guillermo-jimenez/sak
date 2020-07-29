@@ -4,9 +4,9 @@ import pickle
 import importlib
 
 # Data loader to un-clutter code    
-def load_data(filepath):
+def load_data(file):
     dic = dict()
-    with open(filepath) as f:
+    with open(file) as f:
         text = list(f)
     for line in text:
         line = line.replace(' ','').replace('\n','').replace(',,','')
@@ -22,8 +22,8 @@ def load_data(filepath):
     return dic
 
 # Data loader to un-clutter code    
-def save_data(filepath, dic):
-    with open(filepath, 'w') as f:
+def save_data(dic,file):
+    with open(file, 'w') as f:
         for key in dic.keys():
             # f.write("%s,%s\n"%(key,dic[key].tolist()))
             f.write("{},{}\n".format(key,str(dic[key].tolist()).replace(']','').replace('[','').replace(' ','')))
