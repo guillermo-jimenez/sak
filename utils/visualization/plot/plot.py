@@ -96,6 +96,10 @@ def wavelets(
         **kwargs: dict
     ) -> Tuple[Figure, np.ndarray]:
 
+    # Fix if single-lead
+    if y.ndim == 1:
+        y = y[:,None]
+
     # Check if "scales" argument is correctly defined
     if scales is None:
         scales = range(W.shape[-1])
@@ -118,7 +122,11 @@ def wavelets(
     # Check if figure and axes already inputted into plotter, and if correcly defined
     if not (isinstance(fig,Figure) and isinstance(ax,np.ndarray)):
         fig,ax = plt.subplots(**kwargs)
-        
+
+    # Fix if single-lead
+    if ax.ndim == 1:
+        ax = ax[:,None]
+
     # Plot signal
     [ax[0,j].plot(y[:,j]) for j in range(y.shape[1])]
     [[ax[i+1,j].plot(W[:,j,scales[i]]) for j in range(y.shape[1])] for i in range(len(scales))]
