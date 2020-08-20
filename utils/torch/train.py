@@ -103,7 +103,8 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             epoch_train.append(loss_train)
 
             # Validate results
-            loss_valid = do_epoch(model.eval(), state, execution, loader_valid, criterion, metric)
+            with torch.no_grad():
+                loss_valid = do_epoch(model.eval(), state, execution, loader_valid, criterion, metric)
             state['loss_validation'] = np.mean(loss_valid)
             epoch_valid.append(loss_valid)
 
