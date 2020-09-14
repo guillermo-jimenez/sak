@@ -1,2 +1,3 @@
 import utils.data.augmentation
-from ._ops import Struct
+from .__ops import Struct
+from .__ops import ball_scaling
