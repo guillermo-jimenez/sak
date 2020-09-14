@@ -21,6 +21,14 @@ def flatten_along_axis(X: np.ndarray, axis: int = None):
         X = X.flatten()[np.newaxis,:]
     return X
 
+def amplitude(X: np.ndarray, axis: Tuple = None) -> np.ndarray:
+    return X.max(axis=axis) - X.min(axis=axis)
+    
+def min_max_ratio(X: np.ndarray, axis: Tuple = None) -> np.ndarray:
+    maximum = X.max(axis=axis)
+    minimum = X.min(axis=axis)
+    return 1-np.min([np.abs(maximum),np.abs(minimum)])/np.max([np.abs(maximum),np.abs(minimum)])
+    
 def on_off_correction(X: np.ndarray) -> np.ndarray:
     X = np.copy(X)
     
@@ -33,7 +41,7 @@ def on_off_correction(X: np.ndarray) -> np.ndarray:
 
         X[:,i] += np.linspace(-on,-off,X.shape[0])
         
-    return X.squeeze()
+    return X.squeeze(axis=tuple(range(1,X.ndim)))
     
 def abs_max_is_positive(X: np.ndarray, axis: int = None) -> np.ndarray:
     X = flatten_along_axis(X, axis)

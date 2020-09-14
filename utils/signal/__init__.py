@@ -8,6 +8,8 @@ from .__ops import signed_maxima
 from .__ops import zero_crossings
 from .__ops import positive_zero_crossings
 from .__ops import negative_zero_crossings
+from .__ops import min_max_ratio
+from .__ops import amplitude
 from .__ops import maxima
 from .__ops import minima
 from .__ops import is_max
