@@ -24,6 +24,9 @@ def flatten_along_axis(X: np.ndarray, axis: int = None):
 def amplitude(X: np.ndarray, axis: Tuple = None) -> np.ndarray:
     return np.max(X,axis=axis) - np.min(X,axis=axis)
     
+def abs_max(X: np.ndarray, axis: Tuple = None) -> np.ndarray:
+    return np.max(np.abs(X),axis=axis)
+    
 def min_max_ratio(X: np.ndarray, axis: Tuple = None) -> np.ndarray:
     maximum = np.max(X,axis=axis)
     minimum = np.min(X,axis=axis)
