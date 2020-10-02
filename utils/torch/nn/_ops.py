@@ -649,7 +649,7 @@ class Reparameterize(Module):
 
 
 class none(Module):
-    """Does nothing apply dropout"""
+    """Does nothing"""
 
     def __init__(self,*args,**kwargs):
         super(none, self).__init__()
@@ -934,12 +934,13 @@ class Residual(Module):
 
 class Dropout1d(Module):
     """Applies one-dimensional spatial dropout"""
-    def __init__(self, p: [0., 1.]):
+    def __init__(self, p: [0., 1.], inplace: bool = False):
         super(Dropout1d, self).__init__()
         if (p < 0) or (p > 1):
             raise ValueError("Invalid probability {} provided. Must be formatted in range [0,1]".format(p))
         self.p = p
-        self.dropout = Dropout2d(self.p)
+        self.inplace = inplace
+        self.dropout = Dropout2d(self.p, self.inplace)
     
     def forward(self, x: Tensor) -> Tensor:
         # add a dimension for 2D to work -> format BxCxHxW
@@ -947,4 +948,149 @@ class Dropout1d(Module):
         x = self.dropout(x).squeeze(-1)
         return x
 
+
+class ImagePooling2d(Sequential):
+    def __init__(self, in_channels: int = required, out_channels: int = required):
+        super(ImagePooling2d, self).__init__()
+        self.pooling = AdaptiveAvgPool2d(1)
+        self.convolution = SeparableConv2d(in_channels, out_channels, 1, bias=False)
+        self.batchnorm = BatchNorm2d(out_channels)
+        self.relu = ReLU(inplace=True)
+
+        # Check required inputs
+        check_required(self, {"in_channels":in_channels, "out_channels":out_channels})
+
+    def forward(self, x):
+        size = x.shape[2:]
+        x = self.pooling(x)
+        x = self.convolution(x)
+        x = self.batchnorm(x)
+        x = self.relu(x)
+        x = interpolate(x, size=size, mode='bilinear', align_corners=False)
+        return x
+
+
+class PointWiseConv2d(Module):
+    def __init__(self, in_channels: int = required, out_channels: int = required, **kwargs: dict):
+        super(PointWiseConv2d, self).__init__()
+
+        # Check required inputs
+        check_required(self, {"in_channels":in_channels, "out_channels":out_channels})
+
+        # Establish default inputs
+        kwargs["groups"] = 1
+        kwargs["kernel_size"] = 1
+        kwargs["padding"] = 0
+
+        # Declare operation
+        self.pointwise_conv = Conv2d(in_channels, out_channels, **kwargs)
+
+        # Initialize weights values
+        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer(self.pointwise_conv.weight)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.pointwise_conv(x)
+
+
+class DepthwiseConv2d(Module):
+    def __init__(self, in_channels: int = required, kernel_size: int = required, **kwargs: dict):
+        super(DepthwiseConv2d, self).__init__()
+
+        # Check required inputs
+        check_required(self, {"in_channels":in_channels, "kernel_size":kernel_size})
+        
+        # Establish default inputs
+        kwargs["groups"] = in_channels
+        kwargs["padding"] = kwargs.get("padding", (kernel_size-1)//2)
+        if "out_channels" in kwargs:
+            kwargs.pop("out_channels")
+
+        # Declare operation
+        self.depthwise_conv = Conv2d(in_channels, in_channels, kernel_size, **kwargs)
+        
+        # Initialize weights values
+        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer(self.depthwise_conv.weight)
+        
+    def forward(self, x: Tensor) -> Tensor:
+        return self.depthwise_conv(x)
+
+
+class SeparableConv2d(Module):
+    def __init__(self, in_channels: int = required, out_channels: int = required, kernel_size: int = required, **kwargs: dict):
+        super(SeparableConv2d, self).__init__()
+        
+        # Check required inputs
+        check_required(self, {"in_channels":in_channels,"out_channels":out_channels,"kernel_size":kernel_size})
+
+        # Declare operations
+        self.depthwise_conv = DepthwiseConv2d(in_channels, kernel_size, **kwargs)
+        self.pointwise_conv = PointWiseConv2d(in_channels, out_channels, **kwargs)
+        
+    def forward(self, x: Tensor) -> Tensor:
+        h = self.depthwise_conv(x)
+        h = self.pointwise_conv(h)
+        return h
+
+
+class PointWiseConvTranspose2d(Module):
+    def __init__(self, in_channels: int = required, out_channels: int = required, **kwargs: dict):
+        super(PointWiseConvTranspose2d, self).__init__()
+
+        # Check required inputs
+        check_required(self, {"in_channels":in_channels,"out_channels":out_channels})
+
+        # Establish default inputs
+        kwargs["groups"] = 1
+        kwargs["kernel_size"] = 1
+        kwargs["padding"] = 0
+
+        # Declare operation
+        self.pointwise_conv_transp = ConvTranspose2d(in_channels, out_channels, **kwargs)
+
+        # Initialize weights values
+        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer(self.pointwise_conv_transp.weight)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.pointwise_conv_transp(x)
+
+
+class DepthwiseConvTranspose2d(Module):
+    def __init__(self, in_channels: int = required, kernel_size: int = required, **kwargs: dict):
+        super(DepthwiseConvTranspose2d, self).__init__()
+        
+        # Check required inputs
+        check_required(self, {"in_channels":in_channels, "kernel_size":kernel_size})
+
+        # Establish default inputs
+        kwargs["groups"] = in_channels
+        kwargs["padding"] = kwargs.get("padding", (kernel_size-1)//2)
+        if "out_channels" in kwargs:
+            kwargs.pop("out_channels")
+        
+        # Declare operation
+        self.depthwise_conv_transp = ConvTranspose2d(in_channels, in_channels, kernel_size, **kwargs)
+        
+        # Initialize weights values
+        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer(self.depthwise_conv_transp.weight)
+        
+    def forward(self, x: Tensor) -> Tensor:
+        return self.depthwise_conv_transp(x)
+
+
+class SeparableConvTranspose2d(Module):
+    def __init__(self, in_channels: int = required, out_channels: int = required, kernel_size: int = required, **kwargs: dict):
+        super(SeparableConvTranspose2d, self).__init__()
+        
+        # Declare operations
+        self.depthwise_conv_transp = DepthwiseConvTranspose2d(in_channels, kernel_size, **kwargs)
+        self.pointwise_conv_transp = PointWiseConvTranspose2d(in_channels, out_channels, **kwargs)
+        
+    def forward(self, x: Tensor) -> Tensor:
+        h = self.depthwise_conv_transp(x)
+        h = self.pointwise_conv_transp(h)
+        return h
 
