@@ -658,28 +658,6 @@ class none(Module):
     def forward(self, x):
         return x
 
-class Identity(Module):
-    r"""A placeholder identity operator that is argument-insensitive.
-
-    Args:
-        args: any argument (unused)
-        kwargs: any keyword argument (unused)
-
-    Examples::
-
-        >>> m = Identity(54, unused_argument1=0.1, unused_argument2=False)
-        >>> x = torch.randn(128, 20)
-        >>> output = m(x)
-        >>> print(output.size())
-        torch.Size([128, 20])
-
-    """
-    def __init__(self, *args, **kwargs):
-        super(Identity, self).__init__()
-
-    def forward(self, x: Tensor) -> Tensor:
-        return x
-
 
 class Add(Module):
     r"""A placeholder identity operator for addition.
