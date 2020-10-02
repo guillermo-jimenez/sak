@@ -31,6 +31,12 @@ def save_data(dic,file):
 def map_upper(lst: list) -> list:
     return list(map(str.upper,lst))
 
+def argsort_as(x: np.ndarray, template: np.ndarray) -> np.ndarray:
+    x = np.array(x)
+    template = np.array(template)
+    
+    return np.argwhere(template[:,None] == x[None,:])[:,1]
+
 def check_header(header):
     header = list(map(str.upper,header))
     header = np.array(header).squeeze()
