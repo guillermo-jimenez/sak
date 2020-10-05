@@ -1,11 +1,11 @@
-from typing import List, Tuple, Iterable
+from typing import List, Tuple, Iterable, Callable
 import numpy as np
 from skimage.util import view_as_windows
 
 StandardHeader = np.array(['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'])
 
-def moving_lambda(x, w, lmbda):
-    return [lmbda(x[i:i+w]) for i in range(0,len(x),w)]
+def moving_lambda(x: Iterable, stride: int, lmbda: Callable) -> List[Iterable]:
+    return [lmbda(x[i:i+stride]) for i in range(0,len(x),stride)]
 
 def sigmoid(x: float or Iterable) -> float or np.ndarray:
     return 1/(1 + np.exp(-x))
