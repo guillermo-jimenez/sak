@@ -9,6 +9,7 @@ from .__ops import zero_crossings
 from .__ops import positive_zero_crossings
 from .__ops import negative_zero_crossings
 from .__ops import min_max_ratio
+from .__ops import moving_lambda
 from .__ops import amplitude
 from .__ops import abs_max
 from .__ops import maxima

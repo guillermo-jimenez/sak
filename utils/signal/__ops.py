@@ -4,15 +4,22 @@ from skimage.util import view_as_windows
 
 StandardHeader = np.array(['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'])
 
+def moving_lambda(x, w, lmbda):
+    return [lmbda(x[i:i+w]) for i in range(0,len(x),w)]
+
 def sigmoid(x: float or Iterable) -> float or np.ndarray:
     return 1/(1 + np.exp(-x))
 
-def get_mask_boundary(binary_mask: np.ndarray, axis=-1) -> Tuple[list,list]:
+def get_mask_boundary(binary_mask: np.ndarray, axis=-1, aslist=True) -> Tuple[list,list]:
     binary_mask = binary_mask.astype(int)
     diff = np.diff(np.pad(binary_mask,((1,1),),'constant',constant_values=0),axis=axis)
 
-    onsets = (np.where(diff ==  1.)[0]).tolist()
-    offsets = (np.where(diff == -1.)[0] - 1).tolist()
+    onsets = (np.where(diff ==  1.)[0])
+    offsets = (np.where(diff == -1.)[0] - 1)
+
+    if aslist:
+        onsets = onsets.tolist()
+        offsets = offsets.tolist()
     
     return onsets, offsets
 
