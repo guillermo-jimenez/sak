@@ -5,6 +5,7 @@ from .__ops import get_mask_boundary
 from .__ops import abs_max_is_positive
 from .__ops import signed_maxima
 from .__ops import sigmoid
+from .__ops import power
 from .__ops import zero_crossings
 from .__ops import positive_zero_crossings
 from .__ops import negative_zero_crossings

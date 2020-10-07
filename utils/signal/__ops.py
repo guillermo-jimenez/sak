@@ -10,6 +10,10 @@ def moving_lambda(x: Iterable, stride: int, lmbda: Callable) -> List[Iterable]:
 def sigmoid(x: float or Iterable) -> float or np.ndarray:
     return 1/(1 + np.exp(-x))
 
+def power(x: np.ndarray) -> float:
+    """Compute signal power"""
+    return np.mean((X - np.median(X))**2)
+
 def get_mask_boundary(binary_mask: np.ndarray, axis=-1, aslist=True) -> Tuple[list,list]:
     binary_mask = binary_mask.astype(int)
     diff = np.diff(np.pad(binary_mask,((1,1),),'constant',constant_values=0),axis=axis)
