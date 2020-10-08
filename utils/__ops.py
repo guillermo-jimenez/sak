@@ -80,12 +80,38 @@ def pickleload(file: str, mode: str = "rb") -> Any:
         obj = pickle.load(f)
     return obj
 
-def class_selector(module_name: str, class_name: str):
+def class_selector(module_name: str, class_name: str = None):
+    """Dynamically load module from a .json config file with the function call string.
+    
+    Parameters
+    ----------
+    module_name : str
+        Name of the module to load. Might or might not contain the class name. 
+        If it does contain the class name in the string, leave the class_name
+        field as None
+    
+    class_name : str
+        Name of the class within the module_name module. If the class name has
+        been included in the module_name function, use None to mark empty.
+
+    Examples
+    --------
+
+    >>> fnc = utils.class_selector('np.random.randint')
+    >>> fnc(0,4)
+    2
+    >>> fnc = utils.class_selector('np.random','rand')
+    >>> fnc()
+    0.819275482191
+    """
     # load the module, will raise ImportError if module cannot be loaded
+    if class_name is None:
+        class_name = module_name.split('.')[-1]
+        module_name = '.'.join(module_name.split('.')[:-1])
     if class_name == "None":
         class_name = class_name.lower()
     m = importlib.import_module(module_name)
-    # return the class, will raise AttributeError if class cannot be found
+        # return the class, will raise AttributeError if class cannot be found
     return getattr(m, class_name)
 
 # Blatantly stolen from https://github.com/pytorch/pytorch/blob/master/torch/optim/optimizer.py
