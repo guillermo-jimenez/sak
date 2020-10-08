@@ -5,7 +5,7 @@ import sak.data
 import sak.signal
 from scipy.interpolate import interp1d
 import numpy as np
-
+#
 class RandomSpikes(object):
     def __init__(self, amplitude: float, period: int = None, randomize: bool = True):
         self.amplitude = amplitude
