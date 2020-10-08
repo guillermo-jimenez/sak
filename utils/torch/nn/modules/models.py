@@ -1,8 +1,8 @@
 from typing import Any, List, Tuple
 from torch import Tensor
 from torch.nn import Module
-from utils.nn import Sequential
-from utils.nn import Regularization
+from .composers import Sequential
+from .utils import Regularization
 from utils import class_selector
 from utils.__ops import required
 from utils.__ops import check_required

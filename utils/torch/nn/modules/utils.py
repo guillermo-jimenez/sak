@@ -8,6 +8,7 @@ from torch import exp
 from torch import cat
 from torch import randn_like
 from torch.nn import Module
+from .composers import Sequential
 from utils.__ops import required
 from utils.__ops import check_required
 
