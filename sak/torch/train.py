@@ -12,7 +12,7 @@ import torch.nn
 import numpy as np
 import sak.torch.data
 
-def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: torch.sak.data.DataLoader, criterion: Callable, metric: Callable = None) -> Tuple[list, float]:
+def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None) -> Tuple[list, float]:
     """
     Minimum do_epoch example
     1. Select device to send tensors
@@ -91,7 +91,7 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
     return batch_loss
 
 
-def train_model(model, state: dict, execution: dict, loader_train: torch.sak.data.DataLoader, loader_valid: torch.sak.data.DataLoader, criterion: Callable, metric: Callable = None, smaller=True):
+def train_model(model, state: dict, execution: dict, loader_train: torch.utils.data.DataLoader, loader_valid: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None, smaller=True):
     model = model.to(state['device'])
 
     if 'best_loss' not in state:

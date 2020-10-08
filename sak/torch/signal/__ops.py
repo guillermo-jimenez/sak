@@ -1,7 +1,7 @@
 from typing import Tuple, Callable, Iterable, List, Union
 import torch
 import torch.utils
-import torch.sak.data
+import torch.utils.data
 
 from sak.__ops import required
 from sak.__ops import check_required
