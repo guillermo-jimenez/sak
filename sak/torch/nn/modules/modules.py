@@ -13,8 +13,8 @@ from torch.nn import ReLU
 from torch.nn.functional import interpolate
 from .composers import Sequential
 from utils import class_selector
-from utils.__ops import required
-from utils.__ops import check_required
+from sak.__ops import required
+from sak.__ops import check_required
 
 class ImagePooling1d(Sequential):
     def __init__(self, in_channels: int = required, out_channels: int = required):

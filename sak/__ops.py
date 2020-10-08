@@ -97,10 +97,10 @@ def class_selector(module_name: str, class_name: str = None):
     Examples
     --------
 
-    >>> fnc = utils.class_selector('np.random.randint')
+    >>> fnc = sak.class_selector('np.random.randint')
     >>> fnc(0,4)
     2
-    >>> fnc = utils.class_selector('np.random','rand')
+    >>> fnc = sak.class_selector('np.random','rand')
     >>> fnc()
     0.819275482191
     """

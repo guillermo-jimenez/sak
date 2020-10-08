@@ -1,4 +1,4 @@
-import utils.signal.interpolate
+import sak.signal.interpolate
 from .__ops import flatten_along_axis
 from .__ops import on_off_correction
 from .__ops import get_mask_boundary

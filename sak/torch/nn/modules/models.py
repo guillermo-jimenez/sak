@@ -4,8 +4,8 @@ from torch.nn import Module
 from .composers import Sequential
 from .utils import Regularization
 from utils import class_selector
-from utils.__ops import required
-from utils.__ops import check_required
+from sak.__ops import required
+from sak.__ops import check_required
 
 
 def update_regularization(regularization_list: list = required, network_params: dict = required, preoperation=False):

@@ -8,8 +8,8 @@ from .__ops import load_data
 from .__ops import save_data
 from .__ops import argsort_as
 
-import utils.signal
-import utils.visualization
-# import utils.data
-# import utils.wavelet
-# import utils.spectral
+import sak.signal
+import sak.visualization
+# import sak.data
+# import sak.wavelet
+# import sak.spectral

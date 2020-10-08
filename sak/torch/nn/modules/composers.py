@@ -1,4 +1,4 @@
-import utils
+import sak
 import operator
 import networkx
 from collections import OrderedDict
@@ -10,8 +10,8 @@ from numpy import argmax
 from torch import Tensor
 from torch import Size
 from torch.nn import Module
-from utils.__ops import required
-from utils.__ops import check_required
+from sak.__ops import required
+from sak.__ops import check_required
 
 
 class ModelGraph(Module):
@@ -34,7 +34,7 @@ class ModelGraph(Module):
             does_node_return = node['id'] in self.__return_list
             self.graph.add_node(node['id'], returns=does_node_return)
             # Selected class
-            cls = utils.class_selector(node['class'])
+            cls = sak.class_selector(node['class'])
             # Add instantiated class to modules
             self.add_module(node['id'], cls(**node.get('arguments',{})))
         

@@ -1,11 +1,11 @@
 from typing import Any, Tuple, List
-from utils.__ops import required, check_required
+from sak.__ops import required, check_required
 
 import torch
 import torch.nn
-import utils
-import utils.torch
-import utils.torch.nn
+import sak
+import sak.torch
+import sak.torch.nn
 
 def update_regularization(regularization_list: list = required, network_params: dict = required, preoperation=False):
     """Convenience function to update the values of different regularization strategies"""
@@ -40,7 +40,7 @@ class CNN(torch.nn.Module):
         
         # Store inputs
         self.channels = channels
-        self.operation = utils.class_selector(operation['class'])
+        self.operation = sak.class_selector(operation['class'])
         self.operation_params = operation['arguments']
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
@@ -63,7 +63,7 @@ class CNN(torch.nn.Module):
             if self.preoperation:
                 # Regularization
                 if self.regularize_extrema or (not self.regularize_extrema and i != 0):
-                    self.operations.append(utils.torch.nn.Regularization(self.regularization))
+                    self.operations.append(sak.torch.nn.Regularization(self.regularization))
                     
                 # Operation
                 self.operations.append(self.operation(**self.operation_params))
@@ -73,7 +73,7 @@ class CNN(torch.nn.Module):
                 
                 # Regularization
                 if self.regularize_extrema or (not self.regularize_extrema and i != len(channels)-2):
-                    self.operations.append(utils.torch.nn.Regularization(self.regularization))
+                    self.operations.append(sak.torch.nn.Regularization(self.regularization))
                     
             
         # Create sequential model
@@ -95,7 +95,7 @@ class DNN(torch.nn.Module):
         
         # Store inputs
         self.features = features
-        self.operation = utils.class_selector(operation['class'])
+        self.operation = sak.class_selector(operation['class'])
         self.operation_params = operation['arguments']
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
@@ -118,7 +118,7 @@ class DNN(torch.nn.Module):
             if self.preoperation:
                 # Regularization
                 if self.regularize_extrema or (not self.regularize_extrema and i != 0):
-                    self.operations.append(utils.torch.nn.Regularization(self.regularization))
+                    self.operations.append(sak.torch.nn.Regularization(self.regularization))
                     
                 # Operation
                 self.operations.append(self.operation(**self.operation_params))
@@ -128,7 +128,7 @@ class DNN(torch.nn.Module):
                 
                 # Regularization
                 if self.regularize_extrema or (not self.regularize_extrema and i != len(features)-2):
-                    self.operations.append(utils.torch.nn.Regularization(self.regularization))
+                    self.operations.append(sak.torch.nn.Regularization(self.regularization))
                     
             
         # Create sequential model

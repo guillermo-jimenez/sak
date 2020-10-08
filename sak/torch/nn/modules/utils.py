@@ -1,4 +1,4 @@
-import utils
+import sak
 from typing import Any
 from typing import List
 from typing import Tuple
@@ -9,8 +9,8 @@ from torch import cat
 from torch import randn_like
 from torch.nn import Module
 from .composers import Sequential
-from utils.__ops import required
-from utils.__ops import check_required
+from sak.__ops import required
+from sak.__ops import check_required
 
 """
 Order of operations
@@ -43,7 +43,7 @@ class Regularization(Module):
         super(Regularization, self).__init__()
         self.operations = []
         for i in range(len(operations)):
-            self.operations.append(utils.class_selector(operations[i]["class"])(**operations[i].get("arguments",{})))
+            self.operations.append(sak.class_selector(operations[i]["class"])(**operations[i].get("arguments",{})))
         self.operations = Sequential(*self.operations)
     
     def forward(self, x: Tensor) -> Tensor:

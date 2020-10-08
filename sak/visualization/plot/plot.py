@@ -93,6 +93,7 @@ def wavelets(
         figsizemultiplier: int = 2, 
         returns: bool = False, 
         fig: Figure = None, 
+        ax: np.ndarray = None, 
         **kwargs: dict
     ) -> Tuple[Figure, np.ndarray]:
 

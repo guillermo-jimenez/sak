@@ -1,8 +1,8 @@
 import math
 import torch
 import numpy
-import utils.data
-import utils.signal
+import sak.data
+import sak.signal
 from scipy.interpolate import interp1d
 import numpy as np
 
@@ -43,7 +43,7 @@ class RandomSpikes(object):
         noise = interpolator(np.linspace(0,1,N))
         
         # Correct signal
-        noise = utils.data.ball_scaling(utils.signal.on_off_correction(noise),metric=utils.signal.abs_max)
+        noise = sak.data.ball_scaling(sak.signal.on_off_correction(noise),metric=sak.signal.abs_max)
         noise = np.random.choice([-1,1])*noise
         
         # Generate signal-wide noise

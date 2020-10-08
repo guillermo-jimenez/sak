@@ -1,5 +1,5 @@
-import utils
-import utils.signal
+import sak
+import sak.signal
 import numpy as np
 
 def mixup(x1: np.ndarray, x2: np.ndarray, alpha: float = 1.0, beta: float = 1.0, axis = None, shuffle: bool = True):

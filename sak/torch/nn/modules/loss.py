@@ -2,12 +2,12 @@ from typing import Tuple
 import numpy as np
 import torch 
 import torch.nn
-import utils
+import sak
 from torch.nn import MSELoss
 from torch.nn import BCELoss
 
-from utils.__ops import required
-from utils.__ops import check_required
+from sak.__ops import required
+from sak.__ops import check_required
 
 class none:
     def __call__(self, *args,**kwargs): # Stupid wrapper to homogeinize code with the imported classes
@@ -21,7 +21,7 @@ class CompoundLoss:
         
         for operation in json:
             # Retrieve operation class
-            operation_class = utils.class_selector(operation['class'])
+            operation_class = sak.class_selector(operation['class'])
             # Append the instantiated operation alongside weights and mapping
             self.operations.append(operation_class(**operation.get('arguments',{})))
             self.weights.append(operation['weight'])
@@ -112,7 +112,7 @@ class KLDivergence:
         if reduction == 'torch.none': 
             self.reduction = lambda x: x
         else:                         
-            self.reduction = utils.class_selector(reduction)
+            self.reduction = sak.class_selector(reduction)
 
         # check input
         check_required(self, self.__dict__)
@@ -154,7 +154,7 @@ class DiceLoss(torch.nn.Module):
 
 #         reduction = reduction.lower()
 #         if reduction in ['sum', 'mean']:
-#             self.reduction = utils.class_selector('torch',reduction)
+#             self.reduction = sak.class_selector('torch',reduction)
 #         elif reduction == 'none':
 #             self.reduction = lambda x: x
 #         else:

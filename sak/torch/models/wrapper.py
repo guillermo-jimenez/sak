@@ -1,14 +1,14 @@
 import torch
 import torch.nn
-import utils.torch.nn
+import sak.torch.nn
 from typing import Tuple
 
 # Check required arguments as keywords
-from utils.__ops import required
-from utils.__ops import check_required
+from sak.__ops import required
+from sak.__ops import check_required
 
 class VariationalMLPClassification(torch.nn.Module):
-    def __init__(self, VAE: utils.torch.models.Variational, classes: int = required, 
+    def __init__(self, VAE: sak.torch.models.Variational, classes: int = required, 
                        linear_neurons: list = required):
         super(VariationalMLPClassification, self).__init__()
 
@@ -27,28 +27,28 @@ class VariationalMLPClassification(torch.nn.Module):
 
         # Set operations
         initial_operation = [
-            utils.torch.nn.Linear(self.latent_dimension, self.linear_neurons[0]),
+            sak.torch.nn.Linear(self.latent_dimension, self.linear_neurons[0]),
         ]
         middle_operations = []
         for i in range(len(self.linear_neurons)-1):
             # # Activation
-            middle_operations.append(utils.torch.nn.ReLU())
+            middle_operations.append(sak.torch.nn.ReLU())
 
             # Dropout
-            middle_operations.append(utils.torch.nn.Dropout(0.25))
+            middle_operations.append(sak.torch.nn.Dropout(0.25))
 
             # Operation
-            middle_operations.append(utils.torch.nn.Linear(self.linear_neurons[i], self.linear_neurons[i+1]))
+            middle_operations.append(sak.torch.nn.Linear(self.linear_neurons[i], self.linear_neurons[i+1]))
 
         final_operation   = [
-            utils.torch.nn.ReLU(),
-            # utils.torch.nn.Dropout(0.25),
-            utils.torch.nn.Linear(self.linear_neurons[-1], classes),
-            # utils.torch.nn.Softmax(dim=-1)
+            sak.torch.nn.ReLU(),
+            # sak.torch.nn.Dropout(0.25),
+            sak.torch.nn.Linear(self.linear_neurons[-1], classes),
+            # sak.torch.nn.Softmax(dim=-1)
         ]
 
         # Define classification operations
-        self.linear_operations = utils.torch.nn.Sequential(*initial_operation, *middle_operations, *final_operation)
+        self.linear_operations = sak.torch.nn.Sequential(*initial_operation, *middle_operations, *final_operation)
 
     def forward(self, x: torch.Tensor) -> Tuple[torch.Tensor]:
         z, mu, logvar = self.VAE.encode(x)

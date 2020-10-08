@@ -1,8 +1,8 @@
 from typing import Any, List, Tuple
 import numpy as np
 from scipy.signal import lfilter
-from utils.signal.interpolate import interp
-from utils.signal import zero_crossings
+from sak.signal.interpolate import interp
+from sak.signal import zero_crossings
 
 def wav5t(X: np.ndarray, q1: list, q2: list, q3: list, q4: list, q5: list, mode: str = 'edge') -> np.ndarray:
     # Calculates the wavelet transform using quadratic spline wavelet.

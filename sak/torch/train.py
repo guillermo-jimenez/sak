@@ -10,9 +10,9 @@ import tqdm
 import torch
 import torch.nn
 import numpy as np
-import utils.torch.data
+import sak.torch.data
 
-def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None) -> Tuple[list, float]:
+def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: torch.sak.data.DataLoader, criterion: Callable, metric: Callable = None) -> Tuple[list, float]:
     """
     Minimum do_epoch example
     1. Select device to send tensors
@@ -29,20 +29,20 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
         transforms = []
         for aug_type in execution['augmentation']['types']:
             # Retrieve the augmentation object
-            cls =  utils.class_selector(aug_type)
+            cls =  sak.class_selector(aug_type)
             # Initialize with the selected augmentation's arguments
             obj = cls(*execution['augmentation']['types'][k])
             # Add instantiation to current transforms (must have __call__ defined over tensor)
             transforms.append(obj)
         
         # Define the object that will disambiguate between transforms
-        transform_type = utils.class_selector(execution['augmentation']['class'])
+        transform_type = sak.class_selector(execution['augmentation']['class'])
         # Instantiate data augmentation
         augmentation = transform_type(transforms, *execution['augmentation']['arguments'])
 
     # Select iterator decorator
     train_type = 'Train' if model.training else 'Valid'
-    iterator = utils.get_tqdm(dataloader, execution['iterator'], desc="({}) Epoch {:>3d}/{:>3d}, Loss {:0.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.inf))
+    iterator = sak.get_tqdm(dataloader, execution['iterator'], desc="({}) Epoch {:>3d}/{:>3d}, Loss {:0.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.inf))
 
     # Iterate over all data in train/validation/test dataloader:
     print_loss = np.inf
@@ -91,7 +91,7 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
     return batch_loss
 
 
-def train_model(model, state: dict, execution: dict, loader_train: torch.utils.data.DataLoader, loader_valid: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None, smaller=True):
+def train_model(model, state: dict, execution: dict, loader_train: torch.sak.data.DataLoader, loader_valid: torch.sak.data.DataLoader, criterion: Callable, metric: Callable = None, smaller=True):
     model = model.to(state['device'])
 
     if 'best_loss' not in state:
@@ -122,7 +122,7 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
 
             # Save model/state info
             torch.save(model, os.path.join(execution['save_directory'],'checkpoint.model'), pickle_module=dill)
-            utils.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
+            sak.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
             
             # Check if loss is best loss
             compound_loss = 2*state['loss_train']*state['loss_validation']/(state['loss_train']+state['loss_validation'])
@@ -136,9 +136,9 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             
         except KeyboardInterrupt:
             torch.save(model, os.path.join(execution['save_directory'],'keyboard_interrupt.model'), pickle_module=dill)
-            utils.pickledump(state, os.path.join(execution['save_directory'],'keyboard_interrupt.state'), mode='wb')
+            sak.pickledump(state, os.path.join(execution['save_directory'],'keyboard_interrupt.state'), mode='wb')
             raise
         except:
             torch.save(model, os.path.join(execution['save_directory'],'error.model'), pickle_module=dill)
-            utils.pickledump(state, os.path.join(execution['save_directory'],'error.state'), mode='wb')
+            sak.pickledump(state, os.path.join(execution['save_directory'],'error.state'), mode='wb')
             raise

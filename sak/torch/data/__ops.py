@@ -1,7 +1,7 @@
 from typing import Tuple
 import torch
 import torch.utils
-import torch.utils.data
+import torch.sak.data
 import numpy as np
 import numpy.random
 import wfdb
@@ -9,10 +9,10 @@ import os
 import warnings
 from scipy.interpolate import interp1d
 
-from utils.__ops import required
-from utils.__ops import check_required
+from sak.__ops import required
+from sak.__ops import check_required
 
-class Dataset(torch.utils.data.Dataset):
+class Dataset(torch.sak.data.Dataset):
     '''Generates data for PyTorch'''
 
     def __init__(self, X, y=None):
@@ -37,7 +37,7 @@ class Dataset(torch.utils.data.Dataset):
         return self.X[i], self.y[i]
 
 
-class DatasetWFDB(torch.utils.data.Dataset):
+class DatasetWFDB(torch.sak.data.Dataset):
     '''Generates data for PyTorch'''
 
     def __init__(self, samples: dict, beat_distribution: dict, root_dir: str, target_length: int):
@@ -102,7 +102,7 @@ class DatasetWFDB(torch.utils.data.Dataset):
         return X, y
 
 
-class StratifiedSampler(torch.utils.data.sampler.Sampler):
+class StratifiedSampler(torch.sak.data.sampler.Sampler):
     r"""Samples elements in a stratified manner, exhausting all posible files, "without" replacement.
     Arguments:
         data_source (Dataset): dataset to sample from
@@ -148,13 +148,13 @@ class StratifiedSampler(torch.utils.data.sampler.Sampler):
 
 
 
-class StratifiedSamplerWFDB(torch.utils.data.sampler.Sampler):
+class StratifiedSamplerWFDB(torch.sak.data.sampler.Sampler):
     r"""Samples elements in a stratified manner, exhausting all posible files, "without" replacement.
     Arguments:
         data_source (Dataset): dataset to sample from
     """
 
-    def __init__(self, dataset: torch.utils.data.Dataset, limit_N: int = None, maximum_N_per_file: int = 1e7, shuffle: bool = True):
+    def __init__(self, dataset: torch.sak.data.Dataset, limit_N: int = None, maximum_N_per_file: int = 1e7, shuffle: bool = True):
         # Load dataset information
         self.dataset = dataset
         
