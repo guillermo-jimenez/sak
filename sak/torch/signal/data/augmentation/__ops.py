@@ -12,7 +12,7 @@ class RandomSpikes(object):
         self.period = period
         self.randomize = randomize
 
-    def __call__(x: torch.Tensor):
+    def __call__(self, x: torch.Tensor):
         # Get sizes
         batch_size,channels,samples = x.shape
 
