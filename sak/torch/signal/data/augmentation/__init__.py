@@ -1,1 +1,1 @@
-from .__ops import spikes
+from .__ops import RandomSpikes
