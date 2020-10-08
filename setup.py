@@ -7,7 +7,7 @@ setup(
     author="Guillermo Jimenez-Perez",
     author_email=" guillermo.jim.per@gmail.com \n guillermo.jimenez@upf.edu",
     # Needed to actually package something
-    packages=["utils"],
+    packages=["sak"],
     # Needed for dependencies
     install_requires=["numpy", "scipy", "pandas", "wfdb", "dill", 
                       "torch", "torchvision", "tqdm", "scikit-image", 
