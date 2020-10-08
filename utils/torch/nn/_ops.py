@@ -153,7 +153,10 @@ class ModelGraph(Module):
         for node in json['nodes']:
             does_node_return = node['id'] in self.__return_list
             self.graph.add_node(node['id'], returns=does_node_return)
-            self.add_module(node['id'], utils.class_selector('utils.torch.nn',node['class'])(**node.get('arguments',{})))
+            # Selected class
+            cls = utils.class_selector(node['class'])
+            # Add instantiated class to modules
+            self.add_module(node['id'], cls(**node.get('arguments',{})))
         
         # Add edges to graph
         for edge_from, edge_to in json['edges']:
@@ -512,7 +515,7 @@ class Concatenate(Module):
 class CNN(Module):
     def __init__(self, 
                  channels: List[int] = required,
-                 operation: dict = {"class" : "Conv1d"},
+                 operation: dict = {"class" : "torch.nn.Conv1d"},
                  regularization: list = None,
                  regularize_extrema: bool = True,
                  preoperation: bool = False,
@@ -521,7 +524,7 @@ class CNN(Module):
         
         # Store inputs
         self.channels = channels
-        self.operation = utils.class_selector("utils.torch.nn",operation["class"])
+        self.operation = utils.class_selector(operation["class"])
         self.operation_params = operation.get("arguments",{"kernel_size" : 3, "padding" : 1})
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
@@ -570,7 +573,7 @@ class CNN(Module):
 class DNN(Module):
     def __init__(self, 
                  features: List[int] = required,
-                 operation: dict = {"class" : "Linear"},
+                 operation: dict = {"class" : "torch.nn.Linear"},
                  regularization: list = None,
                  regularize_extrema: bool = True,
                  preoperation: bool = False,
@@ -579,7 +582,7 @@ class DNN(Module):
         
         # Store inputs
         self.features = features
-        self.operation = utils.class_selector("utils.torch.nn",operation["class"])
+        self.operation = utils.class_selector(operation["class"])
         self.operation_params = operation.get("arguments",{})
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
@@ -630,7 +633,7 @@ class Regularization(Module):
         super(Regularization, self).__init__()
         self.operations = []
         for i in range(len(operations)):
-            self.operations.append(utils.class_selector("utils.torch.nn",operations[i]["class"])(**operations[i].get("arguments",{})))
+            self.operations.append(utils.class_selector(operations[i]["class"])(**operations[i].get("arguments",{})))
         self.operations = Sequential(*self.operations)
     
     def forward(self, x: Tensor) -> Tensor:
@@ -770,7 +773,7 @@ class PointWiseConv1d(Module):
         self.pointwise_conv = Conv1d(in_channels, out_channels, **kwargs)
 
         # Initialize weights values
-        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer = utils.class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
         initializer(self.pointwise_conv.weight)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -794,7 +797,7 @@ class DepthwiseConv1d(Module):
         self.depthwise_conv = Conv1d(in_channels, in_channels, kernel_size, **kwargs)
         
         # Initialize weights values
-        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer = utils.class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
         initializer(self.depthwise_conv.weight)
         
     def forward(self, x: Tensor) -> Tensor:
@@ -834,7 +837,7 @@ class PointWiseConvTranspose1d(Module):
         self.pointwise_conv_transp = ConvTranspose1d(in_channels, out_channels, **kwargs)
 
         # Initialize weights values
-        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer = utils.class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
         initializer(self.pointwise_conv_transp.weight)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -858,7 +861,7 @@ class DepthwiseConvTranspose1d(Module):
         self.depthwise_conv_transp = ConvTranspose1d(in_channels, in_channels, kernel_size, **kwargs)
         
         # Initialize weights values
-        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer = utils.class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
         initializer(self.depthwise_conv_transp.weight)
         
     def forward(self, x: Tensor) -> Tensor:
@@ -894,7 +897,7 @@ class Residual(Module):
 
         # Define operation to be performed
         self.repetitions = repetitions
-        self.operation = utils.class_selector("utils.torch.nn", operation)
+        self.operation = utils.class_selector(operation)
 
         # Check number of repetitions is higher than 1 (otherwise why bother?)
         if repetitions < 1:
@@ -986,7 +989,7 @@ class PointWiseConv2d(Module):
         self.pointwise_conv = Conv2d(in_channels, out_channels, **kwargs)
 
         # Initialize weights values
-        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer = utils.class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
         initializer(self.pointwise_conv.weight)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -1010,7 +1013,7 @@ class DepthwiseConv2d(Module):
         self.depthwise_conv = Conv2d(in_channels, in_channels, kernel_size, **kwargs)
         
         # Initialize weights values
-        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer = utils.class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
         initializer(self.depthwise_conv.weight)
         
     def forward(self, x: Tensor) -> Tensor:
@@ -1050,7 +1053,7 @@ class PointWiseConvTranspose2d(Module):
         self.pointwise_conv_transp = ConvTranspose2d(in_channels, out_channels, **kwargs)
 
         # Initialize weights values
-        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer = utils.class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
         initializer(self.pointwise_conv_transp.weight)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -1074,7 +1077,7 @@ class DepthwiseConvTranspose2d(Module):
         self.depthwise_conv_transp = ConvTranspose2d(in_channels, in_channels, kernel_size, **kwargs)
         
         # Initialize weights values
-        initializer = utils.class_selector("torch.nn.init", kwargs.get("initializer","xavier_normal_"))
+        initializer = utils.class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
         initializer(self.depthwise_conv_transp.weight)
         
     def forward(self, x: Tensor) -> Tensor:

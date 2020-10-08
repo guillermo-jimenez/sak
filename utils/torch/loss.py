@@ -54,7 +54,10 @@ class CompoundLoss:
         self.mappings = []
         
         for operation in json:
-            self.operations.append(utils.class_selector('utils.torch.loss',operation['class'])(**operation.get('arguments',{})))
+            # Retrieve operation class
+            operation_class = utils.class_selector(operation['class'])
+            # Append the instantiated operation alongside weights and mapping
+            self.operations.append(operation_class(**operation.get('arguments',{})))
             self.weights.append(operation['weight'])
             self.mappings.append(operation['mapping'])
             
@@ -132,15 +135,18 @@ class KLD_BCE:
         return bce + self.beta*kl
 
 class KLDivergence:
-    def __init__(self, reduction='mean', **kwargs):
+    def __init__(self, reduction='torch.mean', **kwargs):
         # Mimic pytorch reductions (https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/loss.py#L373)
+        # Preprocess input
         reduction = reduction.lower()
-        if reduction in ['sum', 'mean']:
-            self.reduction = utils.class_selector('torch',reduction)
-        elif reduction == 'none':
+        if len(reduction.split('.')) == 1: 
+            reduction = 'torch.{}'.format(reduction)
+
+        # Retrieve function
+        if reduction == 'torch.none': 
             self.reduction = lambda x: x
-        else:
-            raise ValueError("Invalid reduction method '{}'".format(reduction))
+        else:                         
+            self.reduction = utils.class_selector(reduction)
 
         # check input
         check_required(self, self.__dict__)

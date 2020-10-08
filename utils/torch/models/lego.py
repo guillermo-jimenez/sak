@@ -40,7 +40,7 @@ class CNN(torch.nn.Module):
         
         # Store inputs
         self.channels = channels
-        self.operation = utils.class_selector('utils.torch.nn',operation['class'])
+        self.operation = utils.class_selector(operation['class'])
         self.operation_params = operation['arguments']
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
@@ -95,7 +95,7 @@ class DNN(torch.nn.Module):
         
         # Store inputs
         self.features = features
-        self.operation = utils.class_selector('utils.torch.nn',operation['class'])
+        self.operation = utils.class_selector(operation['class'])
         self.operation_params = operation['arguments']
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema

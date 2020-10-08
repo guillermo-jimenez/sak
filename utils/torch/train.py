@@ -27,10 +27,18 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
     # Apply data augmentation
     if 'augmentation' in execution:
         transforms = []
-        for k in execution['augmentation']['types']:
-            transforms.append(utils.class_selector('utils.torch.data.augmentation',k)(*execution['augmentation']['types'][k]))
-            
-        augmentation = utils.class_selector('torchvision.transforms',execution['augmentation']['class'])(transforms, *execution['augmentation']['arguments'])
+        for aug_type in execution['augmentation']['types']:
+            # Retrieve the augmentation object
+            cls =  utils.class_selector(aug_type)
+            # Initialize with the selected augmentation's arguments
+            obj = cls(*execution['augmentation']['types'][k])
+            # Add instantiation to current transforms (must have __call__ defined over tensor)
+            transforms.append(obj)
+        
+        # Define the object that will disambiguate between transforms
+        transform_type = utils.class_selector(execution['augmentation']['class'])
+        # Instantiate data augmentation
+        augmentation = transform_type(transforms, *execution['augmentation']['arguments'])
 
     # Select iterator decorator
     train_type = 'Train' if model.training else 'Valid'
