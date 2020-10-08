@@ -31,7 +31,7 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
             # Retrieve the augmentation object
             cls =  sak.class_selector(aug_type)
             # Initialize with the selected augmentation's arguments
-            obj = cls(*execution['augmentation']['types'][k])
+            obj = cls(*execution['augmentation']['types'][aug_type])
             # Add instantiation to current transforms (must have __call__ defined over tensor)
             transforms.append(obj)
         
