@@ -12,7 +12,7 @@ from torch.nn import AdaptiveAvgPool2d
 from torch.nn import ReLU
 from torch.nn.functional import interpolate
 from .composers import Sequential
-from utils import class_selector
+from sak import class_selector
 from sak.__ops import required
 from sak.__ops import check_required
 

@@ -3,7 +3,7 @@ from torch import Tensor
 from torch.nn import Module
 from .composers import Sequential
 from .utils import Regularization
-from utils import class_selector
+from sak import class_selector
 from sak.__ops import required
 from sak.__ops import check_required
 
