@@ -3,42 +3,8 @@ import numpy as np
 import torch 
 import torch.nn
 import utils
-from torch.nn import L1Loss
 from torch.nn import MSELoss
-from torch.nn import CrossEntropyLoss
-from torch.nn import CTCLoss
-from torch.nn import NLLLoss
-from torch.nn import PoissonNLLLoss
-from torch.nn import KLDivLoss
 from torch.nn import BCELoss
-from torch.nn import BCEWithLogitsLoss
-from torch.nn import MarginRankingLoss
-from torch.nn import HingeEmbeddingLoss
-from torch.nn import MultiLabelMarginLoss
-from torch.nn import SmoothL1Loss
-from torch.nn import SoftMarginLoss
-from torch.nn import MultiLabelSoftMarginLoss
-from torch.nn import CosineEmbeddingLoss
-from torch.nn import MultiMarginLoss
-from torch.nn import TripletMarginLoss
-# from torch.nn.functional import binary_cross_entropy
-# from torch.nn.functional import binary_cross_entropy_with_logits
-# from torch.nn.functional import poisson_nll_loss
-# from torch.nn.functional import cosine_embedding_loss
-# from torch.nn.functional import cross_entropy
-# from torch.nn.functional import hinge_embedding_loss
-# from torch.nn.functional import kl_div
-# from torch.nn.functional import l1_loss
-# from torch.nn.functional import mse_loss
-# from torch.nn.functional import margin_ranking_loss
-# from torch.nn.functional import multilabel_margin_loss
-# from torch.nn.functional import multilabel_soft_margin_loss
-# from torch.nn.functional import multi_margin_loss
-# from torch.nn.functional import nll_loss
-# from torch.nn.functional import smooth_l1_loss
-# from torch.nn.functional import soft_margin_loss
-# from torch.nn.functional import triplet_margin_loss
-# from torch.nn.functional import ctc_loss
 
 from utils.__ops import required
 from utils.__ops import check_required
