@@ -25,7 +25,7 @@ def load_data(file, dtype=int):
     return dic
 
 # Data loader to un-clutter code    
-def save_data(filepath, dic):
+def save_data(dic,filepath):
     with open(filepath, 'w') as f:
         for key in dic.keys():
             # f.write("%s,%s\n"%(key,dic[key].tolist()))
