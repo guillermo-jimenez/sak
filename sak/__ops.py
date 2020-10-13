@@ -65,7 +65,7 @@ def channel2index(channel: str, header=["I", "II", "III", "AVR", "AVL", "AVF", "
     
 def get_tqdm(iterator: iter, type: str = "tqdm", **kwargs) -> Any:
     try:
-        iterator = class_selector("tqdm", type)(iterator, **kwargs)
+        iterator = class_selector(type)(iterator, **kwargs)
     except:
         iterator = iterator
 
