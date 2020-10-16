@@ -63,10 +63,11 @@ def channel2index(channel: str, header=["I", "II", "III", "AVR", "AVL", "AVF", "
         raise ValueError("Channel {} not found in header with channels {}".format(channel, header))
     return np.where(np.array(header) == channel.upper())[0][0]
     
-def get_tqdm(iterator: iter, type: str = "tqdm", **kwargs) -> Any:
+def get_tqdm(iterator: iter, type: str = "tqdm.tqdm", **kwargs) -> Any:
     try:
         iterator = class_selector(type)(iterator, **kwargs)
     except:
+        print("valid tqdm not found, inputted: {}. continuing...".format(iterator))
         iterator = iterator
 
     return iterator
