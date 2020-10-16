@@ -134,17 +134,33 @@ class KLDivergence:
         return self.reduction(torch.exp(logvar) + mu**2 - 1. - logvar)
 
 class DiceLoss(torch.nn.Module):
-    def __init__(self, eps: float = 1e-6, smooth: int = 1.):
+    def __init__(self, reduction: str = 'mean', eps: float = 1e-6):
         self.eps = eps
-        self.smooth = smooth
+        if reduction == 'mean':
+            self.reduction = torch.mean
+        elif reduction == 'sum':
+            self.reduction = torch.sum
+        elif reduction == 'none':
+            self.reduction = lambda x: x
+
         super().__init__()
         
-    def forward(self, input: torch.tensor, target: torch.tensor) -> torch.tensor:
-        intersection = (target*input).sum()
-        union = (target+input).sum()
-        loss = (1 - ((2. * intersection + self.smooth + self.eps) / 
-                        (union + self.smooth + self.eps)))
-        return torch.mean(loss)
+    def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None) -> torch.tensor:
+        # Preprocess inputs
+        input = torch.flatten(input, start_dim=1)
+        target = torch.flatten(target, start_dim=1)
+
+        # Compute dice loss (per sample)
+        intersection = (target*input).sum(dim=-1)
+        union = (target+input).sum(dim=-1)
+        loss = 1 - 2.*(intersection + self.eps)/(union + self.eps)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+        
+        # Return reduced (batch) loss
+        return self.reduction(loss)
 
 # class KLDivergence:
 #     def __init__(self, reduction='mean', batch_size=required, input_shape=required, **kwargs):
