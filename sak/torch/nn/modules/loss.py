@@ -135,13 +135,13 @@ class KLDivergence:
 
 class DiceLoss(torch.nn.Module):
     def __init__(self, reduction: str = 'mean', eps: float = 1e-6):
+        # Epsilon (division by zero)
         self.eps = eps
-        if reduction == 'mean':
-            self.reduction = torch.mean
-        elif reduction == 'sum':
-            self.reduction = torch.sum
-        elif reduction == 'none':
-            self.reduction = lambda x: x
+
+        # Reduction
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
 
         super().__init__()
         
