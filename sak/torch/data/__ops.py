@@ -1,4 +1,5 @@
-from typing import Tuple
+from typing import Tuple, Iterable, Union, List, Callable, Sized
+import math
 import torch
 import torch.utils
 import torch.utils.data
@@ -11,6 +12,104 @@ from scipy.interpolate import interp1d
 
 from sak.__ops import required
 from sak.__ops import check_required
+
+
+class UniformMultiDataset(torch.utils.data.Dataset):
+    '''Composer that draws samples from multiple dataset classes. Only
+    to be used with UniformMultiSampler'''
+
+    def __init__(self, datasets: Iterable[torch.utils.data.Dataset], 
+                 draws: Union[Iterable,int] = 1, 
+                 weights: Union[Iterable,int] = 1,
+                 return_weights: bool = False,
+                 shuffle: bool = True):
+        # Datasets
+        if isinstance(datasets, Iterable):
+            self.datasets = datasets
+        else:
+            raise ValueError("'datasets' must be an iterable")
+
+        # Draws
+        if isinstance(draws, Iterable):
+            assert len(datasets) == len(draws)
+            assert all([d > 0 for d in draws])
+            self.draws = draws
+        elif isinstance(draws, int):
+            self.draws = [draws for _ in self.datasets]
+        else:
+            raise ValueError("'draws' must be an iterable or a single int")
+
+        # Weights
+        if isinstance(weights, Iterable):
+            assert len(datasets) == len(weights)
+            self.weights = weights
+        elif isinstance(weights, int):
+            self.weights = [weights for _ in self.datasets]
+        else:
+            raise ValueError("'weights' must be an iterable or a single int")
+        
+        # Compute number of generable samples & iterations
+        self.iterations = math.ceil(max([len(d)/self.draws[i] for i,d in enumerate(self.datasets)]))
+        self.len = self.iterations*sum(self.draws)
+        self.indices = [np.arange(len(d)) for d in self.datasets]
+        self.__return_weights = return_weights
+
+    def __len__(self):
+        return self.len
+
+    def __getitem__(self, index):
+        # Retrieve indices
+        i,g = index
+
+        # Retrieve dataset
+        dataset = self.datasets[g]
+        
+        # If the index exceeds the number of elements, module
+        i = i%len(dataset)
+        
+        # Define output
+        out = dataset[i]
+        if self.__return_weights: 
+            out = (*out, self.weights[g])
+        
+        return out
+
+    
+class UniformMultiSampler(torch.utils.data.Sampler):
+    def __init__(self, data_source: Sized) -> None:
+        self.data_source = data_source
+        self.groups = [len(d) for d in self.data_source.datasets]
+        self.iterations = data_source.iterations
+        self.len = data_source.len
+
+    @property
+    def num_samples(self) -> int:
+        # dataset size might change at runtime
+        return sum(self.groups)
+
+    def __iter__(self):
+        # Iterate over dataset
+        ordering = np.random.permutation(np.arange(len(self.data_source.datasets)))
+        index_dataset = np.concatenate([[i]*(self.data_source.draws[i]) for i in ordering])
+        index_dataset = np.tile(index_dataset,self.iterations)
+
+        # Iterate over windows
+        index_windows = np.zeros_like(index_dataset)
+        for i,draw in enumerate(self.data_source.draws):
+            num_indices = draw*self.iterations
+            index_temp = [np.random.permutation(start+np.arange(self.groups[i])) for start in range(0,num_indices,self.groups[i])]
+            index_windows[index_dataset == i] = np.concatenate(index_temp)[:num_indices]
+        
+        # Instantiate generator
+        generator = torch.Generator()
+        generator.manual_seed(int(torch.empty((), dtype=torch.int64).random_().item()))
+        
+        # Return iterable
+        yield from zip(index_windows,index_dataset)
+
+    def __len__(self):
+        return sum(self.groups)
+
 
 class Dataset(torch.utils.data.Dataset):
     '''Generates data for PyTorch'''
