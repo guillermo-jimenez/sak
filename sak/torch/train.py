@@ -12,7 +12,9 @@ import torch.nn
 import numpy as np
 import sak.torch.data
 
-def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None) -> Tuple[list, float]:
+def do_epoch(model: torch.nn.Module, state: dict, execution: dict, 
+             dataloader: torch.utils.data.DataLoader, 
+             criterion: Callable, metric: Callable = None) -> list:
     """
     Minimum do_epoch example
     1. Select device to send tensors
@@ -46,14 +48,27 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
 
     # Iterate over all data in train/validation/test dataloader:
     print_loss = np.inf
-    for i, (X, y) in enumerate(iterator):
+    for i, inputs in enumerate(iterator):
+        # Retrieve input information
+        if isinstance(inputs, list):
+            if   len(inputs) == 1: X, y,  sample_weights = inputs[0], None, None
+            elif len(inputs) == 2: (X,y,),sample_weights = inputs, None
+            elif len(inputs) == 3: X, y,  sample_weights = inputs
+        elif isinstance(inputs, torch.Tensor):
+            X,y,sample_weights = inputs,None,None
+        else:
+            raise ValueError("Check provided inputs")
+
         # # Apply data augmentation
         if model.training and ('augmentation' in execution):
             X = augmentation(X)
 
         # Send elements to device
         X = X.float().to(state['device'], non_blocking=True)
-        y = y.to(state['device'], non_blocking=True)
+        if y is not None:
+            y = y.to(state['device'], non_blocking=True)
+        if sample_weights is not None:
+            sample_weights = sample_weights.to(state['device'], non_blocking=True)
 
         # Set gradient to zero
         if model.training: 
@@ -64,14 +79,14 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict, dataloader: t
         out = (out,) if not isinstance(out, tuple) else out
 
         # Calculate loss
-        loss = criterion(X,y,*out)
+        loss = criterion(X,y,sample_weight=sample_weights,*out)
 
         # Break early
         if torch.isnan(loss):
             raise ValueError("Nan loss value encountered. Stopping...")
 
         # Retrieve for printing purposes
-        print_loss = metric(X,y,*out) if metric is not None else loss.item()
+        print_loss = metric(X,y,sample_weight=sample_weights,*out) if metric is not None else loss.item()
         
         # Optimize network's weights
         if model.training:
