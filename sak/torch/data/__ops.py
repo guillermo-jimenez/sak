@@ -89,7 +89,7 @@ class UniformMultiSampler(torch.utils.data.Sampler):
     @property
     def num_samples(self) -> int:
         # dataset size might change at runtime
-        return sum(self.groups)
+        return self.len
 
     def __iter__(self):
         # Iterate over dataset
@@ -112,7 +112,7 @@ class UniformMultiSampler(torch.utils.data.Sampler):
         yield from zip(index_windows,index_dataset)
 
     def __len__(self):
-        return sum(self.groups)
+        return self.len
 
 
 class Dataset(torch.utils.data.Dataset):
