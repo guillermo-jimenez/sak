@@ -64,7 +64,7 @@ class UniformMultiDataset(torch.utils.data.Dataset):
         # Retrieve dataset
         dataset = self.datasets[g]
         
-        # If the index exceeds the number of elements, module
+        # If the index exceeds the number of elements, use module
         i = i%len(dataset)
         
         # Define output
@@ -76,11 +76,15 @@ class UniformMultiDataset(torch.utils.data.Dataset):
 
     
 class UniformMultiSampler(torch.utils.data.Sampler):
-    def __init__(self, data_source: Sized) -> None:
-        self.data_source = data_source
-        self.groups = [len(d) for d in self.data_source.datasets]
-        self.iterations = data_source.iterations
-        self.len = data_source.len
+    '''Random uniform sampler that oversamples the minority class according
+    to the information in the dataset. To be used exclusively with the 
+    UniformMultiDataset class'''
+
+    def __init__(self, dataset: Sized) -> None:
+        self.dataset = dataset
+        self.groups = [len(d) for d in self.dataset.datasets]
+        self.iterations = dataset.iterations
+        self.len = dataset.len
 
     @property
     def num_samples(self) -> int:
@@ -89,13 +93,13 @@ class UniformMultiSampler(torch.utils.data.Sampler):
 
     def __iter__(self):
         # Iterate over dataset
-        ordering = np.random.permutation(np.arange(len(self.data_source.datasets)))
-        index_dataset = np.concatenate([[i]*(self.data_source.draws[i]) for i in ordering])
+        ordering = np.random.permutation(np.arange(len(self.dataset.datasets)))
+        index_dataset = np.concatenate([[i]*(self.dataset.draws[i]) for i in ordering])
         index_dataset = np.tile(index_dataset,self.iterations)
 
         # Iterate over windows
         index_windows = np.zeros_like(index_dataset)
-        for i,draw in enumerate(self.data_source.draws):
+        for i,draw in enumerate(self.dataset.draws):
             num_indices = draw*self.iterations
             index_temp = [np.random.permutation(start+np.arange(self.groups[i])) for start in range(0,num_indices,self.groups[i])]
             index_windows[index_dataset == i] = np.concatenate(index_temp)[:num_indices]
@@ -204,7 +208,7 @@ class DatasetWFDB(torch.utils.data.Dataset):
 class StratifiedSampler(torch.utils.data.sampler.Sampler):
     r"""Samples elements in a stratified manner, exhausting all posible files, "without" replacement.
     Arguments:
-        data_source (Dataset): dataset to sample from
+        dataset (Dataset): dataset to sample from
     """
 
     def __init__(self, groups: np.ndarray = required, shuffle=True):
@@ -250,7 +254,7 @@ class StratifiedSampler(torch.utils.data.sampler.Sampler):
 class StratifiedSamplerWFDB(torch.utils.data.sampler.Sampler):
     r"""Samples elements in a stratified manner, exhausting all posible files, "without" replacement.
     Arguments:
-        data_source (Dataset): dataset to sample from
+        dataset (Dataset): dataset to sample from
     """
 
     def __init__(self, dataset: torch.utils.data.Dataset, limit_N: int = None, maximum_N_per_file: int = 1e7, shuffle: bool = True):
