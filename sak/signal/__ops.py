@@ -64,8 +64,22 @@ def abs_max_is_positive(X: np.ndarray, axis: int = None) -> np.ndarray:
     return X[np.arange(X.shape[0]),np.abs(X).argmax(axis=-1)] == X[np.arange(X.shape[0]),X.argmax(axis=-1)].squeeze()
 
 def signed_maxima(X: np.ndarray, axis: int = None) -> np.ndarray:
+    if not isinstance(X, np.ndarray):
+        input_type = type(X)
+        X = np.array(X)
+        if X.dtype == 'O':
+            raise ValueError("Invalid input data type: {}".format(input_type))
     X = flatten_along_axis(X, axis)
     return X[np.arange(X.shape[0]),np.abs(X).argmax(axis=-1)].squeeze()
+
+def signed_minima(X: np.ndarray, axis: int = None) -> np.ndarray:
+    if not isinstance(X, np.ndarray):
+        input_type = type(X)
+        X = np.array(X)
+        if X.dtype == 'O':
+            raise ValueError("Invalid input data type: {}".format(input_type))
+    X = flatten_along_axis(X, axis)
+    return X[np.arange(X.shape[0]),np.abs(X).argmin(axis=-1)].squeeze()
 
 def is_max(X: np.ndarray, sample: int) -> bool:
     """Returns boolean true if sample is maxima of array"""
@@ -132,25 +146,33 @@ def xcorr(x: np.ndarray, y: np.ndarray = None, normed: bool = True, maxlags: int
 
 def __xcorr_single(x: np.ndarray, y: np.ndarray, normed: bool, maxlags: int) -> Tuple[np.ndarray, np.ndarray]:
     # Check dimensions
-    Nx = x.shape[0]
-    if Nx != y.shape[0]:
-        raise ValueError('x and y must be equal length')
-    
-    c = np.correlate(x, y, mode='full')
+    assert x.shape[0] == y.shape[0], "The size of x and y must be the same"
 
+    # Retrieve Nx
+    Nx = x.shape[0]
+    
+    # Define maxlags
+    if maxlags is None:
+        maxlags = Nx - 1
+
+    if maxlags >= Nx or maxlags < 0:
+        raise ValueError('maglags must be None or strictly '
+                         'positive < %d' % Nx)
+
+    # Correlate signals
+    corr_mode = 'full' if maxlags != 0 else 'valid'
+    c = np.correlate(x, y, mode=corr_mode)
+
+    # Proceed to normalize output
     if normed:
         n = np.sqrt(np.dot(x, x) * np.dot(y, y)) # this is the transformation function
         c = np.true_divide(c,n)
 
-    if maxlags is None:
-        maxlags = Nx - 1
-
-    if maxlags >= Nx or maxlags < 1:
-        raise ValueError('maglags must be None or strictly '
-                         'positive < %d' % Nx)
-    
+    # Retrieve lags vector and refine if maxlags < Nx-1
     lags = np.arange(-maxlags, maxlags + 1)
-    c = c[Nx - 1 - maxlags:Nx + maxlags]
+    if maxlags > 0:
+        c = c[Nx - 1 - maxlags:Nx + maxlags]
+
     return c, lags
 
 
