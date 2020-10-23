@@ -53,7 +53,7 @@ class ModelGraph(Module):
 
         # Check structural integrity of the produced network
         terminal_outputs = set(itertools.chain(*[function['outputs'] for function in json['functions']]))
-        terminal_nodes = set([x for x in self.graph.nodes() if self.graph.out_degree(x)==0 and self.graph.in_degree(x)==1])
+        terminal_nodes = set([x for x in self.graph.nodes() if self.graph.out_degree(x)==0 and self.graph.in_degree(x)>=1])
         if len(terminal_nodes) != len(terminal_outputs):
             warnings.warn("Nodes {} are leafs but not marked as outputs. Check the provided config file".format(terminal_nodes-terminal_outputs))
 
