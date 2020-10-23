@@ -1,14 +1,12 @@
+from typing import Tuple, Union, Iterable, List, Dict, Optional
 import sak
 import operator
 import networkx
+import itertools
+import numpy as np
 from collections import OrderedDict
 from torch._jit_internal import _copy_to_script_wrapper
-from itertools import islice
-from typing import Tuple
-from numpy import array
-from numpy import argmax
 from torch import Tensor
-from torch import Size
 from torch.nn import Module
 from sak.__ops import required
 from sak.__ops import check_required
@@ -20,19 +18,22 @@ class ModelGraph(Module):
     def __init__(self, json):
         super(ModelGraph, self).__init__()
         
-        # Compose network
+        # Network's computational graph
         self.graph = networkx.DiGraph()
 
         # Retrieve output list for forward function
+        self.__input_list = []
         self.__return_list = []
         for function in json['functions']:
             if function['name'] == 'forward':
+                self.__input_list += function['inputs']
                 self.__return_list += function['outputs']
 
         # Add nodes to graph
         for node in json['nodes']:
+            is_node_input = node['id'] in self.__input_list
             does_node_return = node['id'] in self.__return_list
-            self.graph.add_node(node['id'], returns=does_node_return)
+            self.graph.add_node(node['id'], returns=does_node_return, inputs=is_node_input)
             # Selected class
             cls = sak.class_selector(node['class'])
             # Add instantiated class to modules
@@ -58,15 +59,17 @@ class ModelGraph(Module):
             subgraphs = []
             
             for output in function['outputs']:
-                if len(function['inputs']) > 1:
-                    raise NotImplementedError("Not yet implemented for more than one input per function")
-                else:
-                    input = function['inputs'][0]
+                # 1. Compute all simple paths from all list of inputs to the specific output
+                nodes_path = []
+                for input in function['inputs']:
+                    nodes_path.append(networkx.all_simple_paths(self.graph, input, output))
                 
-                # 1. Determine all necessary nodes for that specific output
-                nodes_path = set([n for l in list(networkx.all_simple_paths(self.graph,input,output)) for n in l])
+                # 2. Determine all necessary nodes for that specific output
+                nodes_path = set(itertools.chain(*itertools.chain(*nodes_path)))
+
                 # 2. Obtain subgraph
                 subgraphs.append(networkx.DiGraph(self.graph.subgraph(nodes_path)))
+
                 # 3. Order topologically the subset of nodes
                 all_executions.append(list(networkx.topological_sort(subgraphs[-1])))
 
@@ -84,7 +87,7 @@ class ModelGraph(Module):
         if not -size <= idx < size:
             raise IndexError('index {} is out of range'.format(idx))
         idx %= size
-        return next(islice(iterator, idx, None))
+        return next(itertools.islice(iterator, idx, None))
 
     @_copy_to_script_wrapper
     def __getitem__(self, idx):
@@ -129,32 +132,43 @@ class ModelGraph(Module):
         if isinstance(start_nodes, list):
             start_nodes = tuple(start_nodes)
         if isinstance(end_nodes,list):
-            end_nodes = array(end_nodes)
+            end_nodes = np.array(end_nodes)
         else:
-            end_nodes = array([end_nodes])
+            end_nodes = np.array([end_nodes])
         
         # Retrieve execution information
         all_executions = self.output_paths[name]
         subgraphs = self.subgraphs[name]
 
-        def call(input: Tensor) -> Tuple[Tensor]:
+        def call(input: Dict[str, Tensor]) -> Dict[str, Tensor]:
             # Iterate over paths
-            partial = {'input': input}
-            output = [None for _ in end_nodes]
+            if not isinstance(input, Dict):
+                raise ValueError("Only accepts a dict of torch tensors as input")
+            # Assert all needed keys for the function are contained in the input array
+            assert all([node in input for node in start_nodes]), "Check the call's input contains all the input tensors specified in the config file.\nProvided: {}\nNeeded: {}".format(list(input), list(start_nodes))
             
-            # Iterate over all assigned outputs
+            # Define output structures
+            partial = {}
+            output = {}
+            
+            # Add inputs to "performed" computations
+            partial.update(input)
+
+            # Iterate over all network paths that lead to specific tensors marked as outputs
+            # The "execution_order" variable is the one that carries the weight - has information
+            # of the execution path from the input nodes to the output nodes ordered so that,
+            # during the loop, you never need a partial result that has not been computed beforehand.
             for i,(execution_order,subgraph) in enumerate(zip(all_executions,subgraphs)):
-                # Iterate over execution graph output node
+                # Iterate over execution output path, from input node (no parents)
                 for j,node_to in enumerate(execution_order):
-                    # Check if node_to has already been computed
+                    # Check if node_to has already been computed (e.g. inputs)
                     if node_to in partial:
                         continue
                     
-                    # Check all nodes, ordered topologically
+                    # Check all parent nodes, ordered topologically
                     nodes_from = tuple(subgraph.predecessors(node_to))
-                    if len(nodes_from) == 0:
-                        nodes_from = 'input'
-                    elif len(nodes_from) == 1:
+                    # If a single node is contained, mark to be computed
+                    if len(nodes_from) == 1:
                         nodes_from = nodes_from[0]
 
                     # Prepare inputs
@@ -167,16 +181,17 @@ class ModelGraph(Module):
                         x = (partial[nodes_from],)
 
                     # Compute output
-                    # If node_to is tuple, merging point of parallel
+                    # If node_to is tuple, merging point of parallel/concatenation/etc
                     # branches (no operation to be performed in that case)
                     if not isinstance(node_to, tuple):
                         partial[node_to] = self[node_to](*x)
 
                 # The last node computed is always a terminal node, and is added to the output list
-                output[argmax(end_nodes == node_to)] = partial[node_to]
+                output[node_to] = partial[node_to]
             
             # Return output as a tuple
-            return tuple(output)
+            return output
+
         # return call
         setattr(self, name, call)
         
@@ -190,7 +205,10 @@ class ModelGraph(Module):
                             nodelist=self.__return_list,
                             node_color='r')
         networkx.draw_networkx_nodes(self.graph, pos,
-                            nodelist=[n for n in list(self.graph.nodes) if n not in self.__return_list],
+                            nodelist=self.__input_list,
+                            node_color='g')
+        networkx.draw_networkx_nodes(self.graph, pos,
+                            nodelist=[n for n in list(self.graph.nodes) if (n not in self.__return_list) and (n not in self.__input_list)],
                             node_color='b')
         networkx.draw_networkx_edges(self.graph, pos, width=1.0, alpha=0.5)
         networkx.draw_networkx_labels(self.graph, pos, dict(zip(list(self.graph.nodes.keys()),list(self.graph.nodes.keys()))), font_size=16)
@@ -236,7 +254,7 @@ class Sequential(Module):
         if not -size <= idx < size:
             raise IndexError("index {} is out of range".format(idx))
         idx %= size
-        return next(islice(iterator, idx, None))
+        return next(itertools.islice(iterator, idx, None))
 
     @_copy_to_script_wrapper
     def __getitem__(self, idx):
@@ -265,7 +283,7 @@ class Sequential(Module):
 
     @_copy_to_script_wrapper
     def __dir__(self):
-        keys = super(Parallel, self).__dir__()
+        keys = super(Sequential, self).__dir__()
         keys = [key for key in keys if not key.isdigit()]
         return keys
 
@@ -322,7 +340,7 @@ class Parallel(Module):
         if not -size <= idx < size:
             raise IndexError("index {} is out of range".format(idx))
         idx %= size
-        return next(islice(iterator, idx, None))
+        return next(itertools.islice(iterator, idx, None))
 
     @_copy_to_script_wrapper
     def __getitem__(self, idx):
