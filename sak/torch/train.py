@@ -14,7 +14,7 @@ import sak.torch.data
 
 def do_epoch(model: torch.nn.Module, state: dict, execution: dict, 
              dataloader: torch.utils.data.DataLoader, 
-             criterion: Callable, metric: Callable = None) -> list:
+             criterion: Callable) -> list:
     """
     Minimum do_epoch example
     1. Select device to send tensors
@@ -27,66 +27,42 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict,
     batch_loss = np.zeros((len(dataloader),),dtype='float16')
 
     # Apply data augmentation
-    if 'augmentation' in execution:
-        transforms = []
-        for aug_type in execution['augmentation']['types']:
-            # Retrieve the augmentation object
-            cls =  sak.class_selector(aug_type)
-            # Initialize with the selected augmentation's arguments
-            obj = cls(*execution['augmentation']['types'][aug_type])
-            # Add instantiation to current transforms (must have __call__ defined over tensor)
-            transforms.append(obj)
-        
-        # Define the object that will disambiguate between transforms
-        transform_type = sak.class_selector(execution['augmentation']['class'])
-        # Instantiate data augmentation
-        augmentation = transform_type(transforms, *execution['augmentation']['arguments'])
+    augmentation = sak.class_selector(execution["augmentation"]["class"])(**execution["augmentation"]["arguments"])
 
     # Select iterator decorator
     train_type = 'Train' if model.training else 'Valid'
-    iterator = sak.get_tqdm(dataloader, execution['iterator'], desc="({}) Epoch {:>3d}/{:>3d}, Loss {:0.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.inf))
+    iterator = sak.get_tqdm(dataloader, execution['iterator'], 
+                            desc="({}) Epoch {:>3d}/{:>3d}, Loss {:0.3f}".format(train_type, 
+                                                                                 state['epoch']+1, 
+                                                                                 execution['epochs'], np.inf))
 
     # Iterate over all data in train/validation/test dataloader:
     print_loss = np.inf
     for i, inputs in enumerate(iterator):
-        # Retrieve input information
-        if isinstance(inputs, list):
-            if   len(inputs) == 1: X, y,  sample_weights = inputs[0], None, None
-            elif len(inputs) == 2: (X,y,),sample_weights = inputs, None
-            elif len(inputs) == 3: X, y,  sample_weights = inputs
-        elif isinstance(inputs, torch.Tensor):
-            X,y,sample_weights = inputs,None,None
-        else:
-            raise ValueError("Check provided inputs")
-
-        # # Apply data augmentation
+        # Apply data augmentation
         if model.training and ('augmentation' in execution):
-            X = augmentation(X)
-
-        # Send elements to device
-        X = X.float().to(state['device'], non_blocking=True)
-        if y is not None:
-            y = y.to(state['device'], non_blocking=True)
-        if sample_weights is not None:
-            sample_weights = sample_weights.to(state['device'], non_blocking=True)
+            augmentation(inputs=inputs)
+        
+        # Map all inputs to device
+        for k in inputs:
+            inputs[k] = inputs[k].to(state['device'], non_blocking=True)
 
         # Set gradient to zero
         if model.training: 
             state['optimizer'].zero_grad()
 
         # Predict input data
-        out = model(X)
-        out = (out,) if not isinstance(out, tuple) else out
+        outputs = model(inputs)
 
         # Calculate loss
-        loss = criterion(X,y,sample_weight=sample_weights,*out)
+        loss = criterion(inputs=inputs,outputs=outputs)
 
         # Break early
         if torch.isnan(loss):
             raise ValueError("Nan loss value encountered. Stopping...")
 
         # Retrieve for printing purposes
-        print_loss = metric(X,y,sample_weight=sample_weights,*out) if metric is not None else loss.item()
+        print_loss = loss.item()
         
         # Optimize network's weights
         if model.training:
@@ -106,14 +82,60 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict,
     return batch_loss
 
 
-def train_model(model, state: dict, execution: dict, loader_train: torch.utils.data.DataLoader, loader_valid: torch.utils.data.DataLoader, criterion: Callable, metric: Callable = None, smaller=True):
+def train_model(model, state: dict, execution: dict, loader: torch.utils.data.DataLoader):
+    # Send model to device
     model = model.to(state['device'])
 
+    # Instantiate criterion
+    criterion = sak.class_selector(execution['loss']['class'])(**execution['loss'].get('arguments',{}))
+    
+    # Initialize best loss for early stopping
     if 'best_loss' not in state:
-        state['best_loss'] = -np.inf if not smaller else np.inf
+        state['best_loss'] = np.inf
 
-    epoch_train = []
-    epoch_valid = []
+    for epoch in range(state['epoch'], execution['epochs']):
+        try:
+            # Store current epoch
+            state['epoch'] = epoch
+            
+            # Train model
+            loss_train = do_epoch(model.train(), state, execution, loader, criterion)
+            state['loss_train'] = np.mean(loss_train)
+
+            # Save model/state info
+            torch.save(model, os.path.join(execution['save_directory'],'checkpoint.model'), pickle_module=dill)
+            sak.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
+            
+            # Check if loss is best loss
+            if state['loss_train'] < state['best_loss']:
+                state['best_loss'] = state['loss_train']
+                state['best_epoch'] = epoch
+                
+                # Copy checkpoint and mark as best
+                shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.model'), os.path.join(execution['save_directory'],'model_best.model'))
+                shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.state'), os.path.join(execution['save_directory'],'model_best.state'))
+        except KeyboardInterrupt:
+            torch.save(model, os.path.join(execution['save_directory'],'keyboard_interrupt.model'), pickle_module=dill)
+            sak.pickledump(state, os.path.join(execution['save_directory'],'keyboard_interrupt.state'), mode='wb')
+            raise
+        except:
+            torch.save(model, os.path.join(execution['save_directory'],'error.model'), pickle_module=dill)
+            sak.pickledump(state, os.path.join(execution['save_directory'],'error.state'), mode='wb')
+            raise
+
+
+def train_valid_model(model, state: dict, execution: dict, 
+                      loader_train: torch.utils.data.DataLoader, 
+                      loader_valid: torch.utils.data.DataLoader):
+    # Send model to device
+    model = model.to(state['device'])
+
+    # Instantiate criterion
+    criterion = sak.class_selector(execution['loss']['class'])(**execution['loss'].get('arguments',{}))
+    
+    # Initialize best loss for early stopping
+    if 'best_loss' not in state:
+        state['best_loss'] = np.inf
 
     for epoch in range(state['epoch'], execution['epochs']):
         try:
@@ -121,15 +143,13 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             state['epoch'] = epoch
             
             # Training model
-            loss_train = do_epoch(model.train(), state, execution, loader_train, criterion, metric)
+            loss_train = do_epoch(model.train(), state, execution, loader_train, criterion)
             state['loss_train'] = np.mean(loss_train)
-            epoch_train.append(loss_train)
 
             # Validate results
             with torch.no_grad():
-                loss_valid = do_epoch(model.eval(), state, execution, loader_valid, criterion, metric)
+                loss_valid = do_epoch(model.eval(), state, execution, loader_valid, criterion)
             state['loss_validation'] = np.mean(loss_valid)
-            epoch_valid.append(loss_valid)
 
             # Update learning rate scheduler
             if 'scheduler' in state:
@@ -141,7 +161,7 @@ def train_model(model, state: dict, execution: dict, loader_train: torch.utils.d
             
             # Check if loss is best loss
             compound_loss = 2*state['loss_train']*state['loss_validation']/(state['loss_train']+state['loss_validation'])
-            if ((smaller) and (compound_loss < state['best_loss'])) or ((not smaller) and (compound_loss > state['best_loss'])):
+            if compound_loss < state['best_loss']:
                 state['best_loss'] = compound_loss
                 state['best_epoch'] = epoch
                 

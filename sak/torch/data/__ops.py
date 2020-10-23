@@ -1,4 +1,4 @@
-from typing import Tuple, Iterable, Union, List, Callable, Sized
+from typing import Tuple, Iterable, Union, List, Callable, Sized, Dict
 import math
 import torch
 import torch.utils
@@ -10,6 +10,7 @@ import os
 import warnings
 from scipy.interpolate import interp1d
 
+from sak import class_selector
 from sak.__ops import required
 from sak.__ops import check_required
 
@@ -68,9 +69,10 @@ class UniformMultiDataset(torch.utils.data.Dataset):
         i = i%len(dataset)
         
         # Define output
-        out = dataset[i]
+        out = {}
+        out.update(dataset[i])
         if self.__return_weights: 
-            out = (*out, self.weights[g])
+            out["weights"] = self.weights[g]
         
         return out
 
@@ -137,7 +139,7 @@ class Dataset(torch.utils.data.Dataset):
 
     def __getitem__(self, i: int):
         '''Generates one datapoint''' 
-        return self.X[i], self.y[i]
+        return {"x": self.X[i], "y": self.y[i]}
 
 
 class DatasetWFDB(torch.utils.data.Dataset):
@@ -202,7 +204,7 @@ class DatasetWFDB(torch.utils.data.Dataset):
 
         X = torch.from_numpy(signal[np.newaxis,]) # Only one channel
         y = torch.tensor(int(s))
-        return X, y
+        return {"x": X, "y": y}
 
 
 class StratifiedSampler(torch.utils.data.sampler.Sampler):
