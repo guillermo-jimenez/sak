@@ -1,7 +1,8 @@
-from typing import Any, List, Tuple
+from typing import Any, List, Tuple, Union, Optional
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
-
+import sak
 from matplotlib.figure import Figure
 
 
@@ -49,7 +50,47 @@ def N_leads(
     
     if returns:
         return fig,ax
-    
+
+
+def segmentation(
+        x: np.ndarray, 
+        mask: np.ndarray, 
+        ax: Optional[Union[np.ndarray, matplotlib.axes.Axes]] = None,
+        returns: bool = False, 
+        fig: Optional[matplotlib.figure.Figure] = None,
+        **kwargs: dict
+    ) -> Tuple[Figure, np.ndarray]:
+
+    # Manage inputs
+    if not isinstance(mask, np.ndarray):
+        mask = mask.cpu().detach().numpy()
+    if not isinstance(x, np.ndarray):
+        x = x.cpu().detach().numpy()
+    if mask.shape[1] < mask.shape[0]: 
+        mask = mask.T
+
+    # Retrieve stuff from mask
+    pon,poff = sak.signal.get_mask_boundary(mask[0,:])
+    qrson,qrsoff = sak.signal.get_mask_boundary(mask[1,:])
+    ton,toff = sak.signal.get_mask_boundary(mask[2,:])
+
+    # Set default values
+    kwargs['figsize'] = kwargs.get('figsize', (16,4))
+
+    # Define figure correctly
+    if fig is None:
+        fig = plt.figure(**kwargs)
+    ax = fig.gca()
+
+    # Plot the signal information
+    ax.plot(x)
+    [ax.axvspan(on,off,color='red',alpha=0.15) for on,off in zip(pon,poff)]
+    [ax.axvspan(on,off,color='green',alpha=0.15) for on,off in zip(qrson,qrsoff)]
+    [ax.axvspan(on,off,color='magenta',alpha=0.15) for on,off in zip(ton,toff)]
+
+    if returns: return fig,ax
+ 
+
 def standard(
         x: np.ndarray, 
         y: np.ndarray = None, 
