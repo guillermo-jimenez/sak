@@ -96,6 +96,30 @@ class Add(Module):
         return x + y
 
 
+class Multiply(Module):
+    r"""A placeholder identity operator for multiplication.
+
+    Args:
+        args: any argument (unused)
+        kwargs: any keyword argument (unused)
+
+    Examples::
+
+        >>> m = Multiply(54, unused_argument1=0.1, unused_argument2=False)
+        >>> x = torch.randn(128, 20)
+        >>> y = torch.randn(128, 20)
+        >>> output = m(x,y)
+        >>> print(output.size())
+        torch.Size([128, 20])
+
+    """
+    def __init__(self, *args, **kwargs):
+        super(Multiply, self).__init__()
+
+    def forward(self, x: Tensor, y: Tensor) -> Tensor:
+        return x * y
+
+
 class Squeeze(Module):
     def __init__(self, *args, **kwargs):
         super(Squeeze, self).__init__()
