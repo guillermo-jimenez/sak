@@ -1,3 +1,3 @@
-from .plot import N_leads
-from .plot import standard
-from .plot import wavelets
+from .__ops import N_leads
+from .__ops import standard
+from .__ops import wavelets
