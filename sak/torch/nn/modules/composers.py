@@ -4,6 +4,7 @@ import operator
 import networkx
 import itertools
 import numpy as np
+import warnings
 from collections import OrderedDict
 from torch._jit_internal import _copy_to_script_wrapper
 from torch import Tensor
@@ -49,6 +50,12 @@ class ModelGraph(Module):
 
             # Add edges between nodes
             self.graph.add_edge(edge_from, edge_to)
+
+        # Check structural integrity of the produced network
+        terminal_outputs = set(itertools.chain(*[function['outputs'] for function in json['functions']]))
+        terminal_nodes = set([x for x in self.graph.nodes() if self.graph.out_degree(x)==0 and self.graph.in_degree(x)==1])
+        if len(terminal_nodes) != len(terminal_outputs):
+            warnings.warn("Nodes {} are leafs but not marked as outputs. Check the provided config file".format(terminal_nodes-terminal_outputs))
 
         # Set output computational flows
         self.output_paths = {}
@@ -195,23 +202,26 @@ class ModelGraph(Module):
         # return call
         setattr(self, name, call)
         
-    def draw_networkx(self, ):
-        try: # In case graphviz is installed (mostly for my own use)
-            pos = networkx.drawing.nx_agraph.graphviz_layout(self.graph)
-        except (NameError, ModuleNotFoundError, ImportError) as e:
-            pos = networkx.drawing.layout.planar_layout(self.graph)
-            
-        networkx.draw_networkx_nodes(self.graph, pos,
+    def draw_networkx(self, graph = None):
+        # Prepare input
+        if graph is None:
+            graph = self.graph
+
+        # In case graphviz is installed (mostly for my own use), use that layout
+        pos = networkx.drawing.layout.planar_layout(graph)
+
+        # Draw nodes/edges/labels            
+        networkx.draw_networkx_nodes(graph, pos,
                             nodelist=self.__return_list,
                             node_color='r')
-        networkx.draw_networkx_nodes(self.graph, pos,
+        networkx.draw_networkx_nodes(graph, pos,
                             nodelist=self.__input_list,
                             node_color='g')
-        networkx.draw_networkx_nodes(self.graph, pos,
-                            nodelist=[n for n in list(self.graph.nodes) if (n not in self.__return_list) and (n not in self.__input_list)],
+        networkx.draw_networkx_nodes(graph, pos,
+                            nodelist=[n for n in list(graph.nodes) if (n not in self.__return_list) and (n not in self.__input_list)],
                             node_color='b')
-        networkx.draw_networkx_edges(self.graph, pos, width=1.0, alpha=0.5)
-        networkx.draw_networkx_labels(self.graph, pos, dict(zip(list(self.graph.nodes.keys()),list(self.graph.nodes.keys()))), font_size=16)
+        networkx.draw_networkx_edges(graph, pos, width=1.0, alpha=0.5)
+        networkx.draw_networkx_labels(graph, pos, dict(zip(list(graph.nodes.keys()),list(graph.nodes.keys()))), font_size=16)
 
 
 class Sequential(Module):
