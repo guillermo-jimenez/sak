@@ -1,5 +1,6 @@
-from typing import Dict
+from typing import Dict, List
 from sak import class_selector
+from warnings import warn
 
 class Mapper:
     def __init__(self, json: Dict):
@@ -12,14 +13,17 @@ class Mapper:
         # Check input and output types
         assert all([isinstance(kwargs[k], Dict) for k in kwargs]), "Inputs and outputs must be specified as dicts"
         
-        input_list = []
+        input_args = []
         for dict_from,element in self.input_mappings:
-            input_list.append(kwargs[dict_from][element])
+            input_args.append(kwargs[dict_from][element])
         
-        output = self.function(*input_list)
+        output = self.function(*input_args)
 
         if len(self.output_mappings) == 0:
             return output
         else:
+            if not isinstance(output, List):
+                assert len(self.output_mappings) == 1, "Mismatch between length of resulting operation. Broadcasting..."
+                output = [output]
             for i,(dict_from,element) in enumerate(self.output_mappings):
                 kwargs[dict_from][element] = output[i]
