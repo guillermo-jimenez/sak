@@ -74,7 +74,6 @@ class ModelGraph(Module):
             self.output_paths[function['name']] = all_executions
             
             # Set function
-            # setattr(self, function['name'], self.compose(function['name'],function['inputs'],function['outputs']))
             self.compose(function['name'],function['inputs'],function['outputs'])
 
         
@@ -114,7 +113,7 @@ class ModelGraph(Module):
 
     @_copy_to_script_wrapper
     def __dir__(self):
-        keys = super(Parallel, self).__dir__()
+        keys = super(ModelGraph, self).__dir__()
         keys = [key for key in keys if not key.isdigit()]
         return keys
 
