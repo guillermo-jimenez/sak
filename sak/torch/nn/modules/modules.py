@@ -162,59 +162,6 @@ class SeparableConvTranspose1d(Module):
         return h
 
 
-class Residual(Module):
-    def __init__(self, in_channels: int = required, 
-                       out_channels: int = required, 
-                       kernel_size: int = required,
-                       operation: str = required,
-                       repetitions: int = required,
-                       regularization: dict = {},
-                      **kwargs: dict):
-        super(Residual, self).__init__()
-        
-        # Check required inputs
-        check_required(self, {"in_channels":in_channels,"out_channels":out_channels,"kernel_size":kernel_size,"operation":operation,"repetitions":repetitions})
-
-        # Define operation to be performed
-        self.repetitions = repetitions
-        self.operation = class_selector(operation)
-
-        # Check number of repetitions is higher than 1 (otherwise why bother?)
-        if repetitions < 1:
-            raise ValueError("Number of repetitions must be higher than 1")
-
-        # Stupid decoration
-        __in_channels = in_channels
-
-        # Define stack of operations
-        self.operation_stack = []
-        for i in range(repetitions):
-            self.operation_stack.append(self.operation(in_channels, out_channels, kernel_size, **kwargs))
-            if (regularization) and (i != repetitions-1):
-                self.operation_stack.append(Regularization(**regularization))
-            in_channels = out_channels
-
-        # Operations
-        self.operation_stack = Sequential(*self.operation_stack)
-
-        # Operation if # of channels changes
-        if __in_channels != out_channels:
-            self.output_operation = self.operation(__in_channels, out_channels, kernel_size, **kwargs)
-
-        # Residual
-        self.addition = Add()
-
-    def forward(self, x: Tensor) -> Tensor:
-        h = x.clone()
-        h = self.operation_stack(h)
-        
-        # If the number of channels of x and h does not coincide,
-        # apply same transformation to x
-        if x.shape[1] != h.shape[1]:
-            x = self.output_operation(x)
-
-        return self.addition(x, h) # Residual connection
-
 class Dropout1d(Module):
     """Applies one-dimensional spatial dropout"""
     def __init__(self, p: [0., 1.], inplace: bool = False):

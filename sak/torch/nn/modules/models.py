@@ -145,3 +145,25 @@ class DNN(Module):
         return self.operations(x)
 
 
+class Residual(Module):
+    def __init__(self, operation: Module = required,
+                       residual_operation: dict = {"class": "sak.torch.nn.Add"},
+                       output_operation: dict = {"class": "torch.nn.Conv1d"},
+                       **kwargs: dict):
+        super(Residual, self).__init__()
+        
+        # Check required inputs
+        check_required(self, {"operation":operation})
+
+        # Obtain inputs
+        self.operation = operation
+        self.residual_operation = class_selector(residual_operation["class"])(**residual_operation.get("arguments",{}))
+
+
+    def forward(self, x: Tensor) -> Tensor:
+        h = x.clone()
+        h = self.operation(h)
+        h = self.residual_operation(x,h)
+
+        return h
+
