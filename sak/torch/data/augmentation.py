@@ -34,7 +34,7 @@ class AugmentationComposer(object):
             transforms.append(obj)
 
         if len(transforms) == 0:
-            self.augmentation = lambda *args: args
+            self.augmentation = lambda x: x
         else:
             # Define the object that will disambiguate between transforms
             transform_type = class_selector(dic['class'])
