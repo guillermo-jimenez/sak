@@ -1,8 +1,10 @@
+from typing import Dict, Tuple, List
 import torch
 import numpy as np
 from torchvision.transforms import *
 
 # Check required arguments as keywords
+from sak.__ops import class_selector
 from sak.__ops import required
 from sak.__ops import check_required
 
@@ -15,6 +17,32 @@ class none(object):
 
     def __call__(self, X: torch.Tensor) -> torch.Tensor:
         return X
+
+
+class AugmentationComposer(object):
+    """Compose a random transform according to pre-specified config file"""
+
+    def __init__(self, **dic):
+        # Apply data augmentation
+        transforms = []
+        for aug_type in dic['transforms']:
+            # Retrieve the augmentation object
+            cls = class_selector(aug_type)
+            # Initialize with the selected augmentation's arguments
+            obj = cls(*dic['transforms'][aug_type])
+            # Add instantiation to current transforms (must have __call__ defined over tensor)
+            transforms.append(obj)
+
+        if len(transforms) == 0:
+            self.augmentation = lambda *args: args
+        else:
+            # Define the object that will disambiguate between transforms
+            transform_type = class_selector(dic['class'])
+            # Instantiate data augmentation
+            self.augmentation = transform_type(transforms, **dic.get('arguments',{}))
+
+    def __call__(self, *args: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
+        return self.augmentation(*args)
 
 
 class AdditiveWhiteGaussianNoise(object):
@@ -50,7 +78,7 @@ class SegmentationErrors(object):
         dims (list): axes over which to roll
     """
 
-    def __init__(self, samples: int = required, dims: list = [-1]):
+    def __init__(self, samples: int = required, dims: List = [-1]):
         self.samples = samples
         self.dims = dims
         check_required(self, self.__dict__)
