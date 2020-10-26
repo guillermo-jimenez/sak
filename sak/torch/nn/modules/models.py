@@ -7,6 +7,7 @@ from sak import class_selector
 from sak.__ops import required
 from sak.__ops import check_required
 from functools import reduce
+from sak.torch.nn.modules.utils import Concatenate
 
 
 def update_regularization(regularization_list: list = required, network_params: dict = required, preoperation=False):
@@ -146,18 +147,18 @@ class DNN(Module):
         return self.operations(x)
 
 
-class DCN(Module):
+class DCC(Module):
     def __init__(self,
                  in_channels: int = required,
                  out_channels: int = required,
                  degree: Union[int, List[int]] = required,
                  operation: dict = {"class" : "torch.nn.Conv1d"},
                  regularization: list = None,
-                 residual_operation: dict = {"class": "sak.torch.nn.Add"},
                  regularize_extrema: bool = True,
                  preoperation: bool = False,
+                 include_input: bool = False,
                  **kwargs):
-        super(DCN, self).__init__()
+        super(DCC, self).__init__()
         
         # Fibonacci sequence
         fibonacci = lambda n: reduce(lambda x,n:[x[1],x[0]+x[1]], range(n),[0,1])[0]
@@ -167,7 +168,7 @@ class DCN(Module):
         self.out_channels = out_channels
         self.operation = class_selector(operation["class"])
         self.operation_params = operation.get("arguments",{"kernel_size" : 3, "padding" : 1})
-        self.residual_operation = residual_operation
+        self.include_input = include_input
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
         self.preoperation = preoperation
@@ -184,6 +185,7 @@ class DCN(Module):
             self.operation_params["in_channels"] = self.in_channels if i == 0 else self.out_channels
             self.operation_params["out_channels"] = self.out_channels
             self.operation_params["dilation"] = self.degree[i]
+            self.operation_params["padding"] = self.operation_params["dilation"]*(self.operation_params["kernel_size"]//2)
 
             # Update regularization parameters
             if self.regularization:
@@ -214,16 +216,22 @@ class DCN(Module):
             level_operations = Sequential(*level_operations)
             
             # Apply residual operation
-            if i != 0:
-                self.operations.append(Residual(level_operations, self.residual_operation))
-            else:
-                self.operations.append(level_operations)
+            self.operations.append(level_operations)
+        
+        # Sequential operations
+        self.operations = Sequential(*self.operations)
             
         # Create sequential model
-        self.operations = Sequential(*self.operations)
+        self.merging_operation = Concatenate()
     
     def forward(self, x: Tensor) -> Any:
-        return self.operations(x)
+        out = [x]
+        for op in self.operations:
+            out.append(op(out[-1]))
+        if not self.include_input:
+            out = out[1:]
+        out = self.merging_operation(*out)
+        return out
 
 
 class Residual(Module):
