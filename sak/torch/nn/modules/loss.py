@@ -15,36 +15,29 @@ class none:
         return 0
 
 class CompoundLoss:
-    def __init__(self, json: dict):
+    def __init__(self, operations: dict, weights: list = None):
         self.operations = []
-        self.weights = []
-        self.mappings = []
+        self.weights = weights
         
-        for operation in json:
+        for op in operations:
             # Retrieve operation class
-            operation_class = sak.class_selector(operation['class'])
-            # Append the instantiated operation alongside weights and mapping
-            self.operations.append(operation_class(**operation.get('arguments',{})))
-            self.weights.append(operation['weight'])
-            self.mappings.append(operation['mapping'])
+            cls = sak.class_selector(op['class'])
+            self.operations.append(cls(**op.get('arguments',{})))
             
-    def __call__(self, inputs: Tuple[torch.Tensor], outputs: Tuple[torch.Tensor]) -> torch.Tensor:
+        if self.weights is None:
+            self.weights = [1]*len(self.operations)
+            
+        assert len(self.operations) == len(self.weights), "The number of provided operations mismatches the size of the provided weights"
+            
+    def __call__(self, **kwargs) -> torch.Tensor:
         loss = 0
+        
         for i in range(len(self.operations)):
-            selected = []
-            for m in self.mappings[i]:
-                (type, index) = m.split('_')
-                if type.lower() == 'input':
-                    selected.append(inputs[int(index)])
-                elif type.lower() == 'output':
-                    selected.append(outputs[int(index)])
-                else:
-                    raise ValueError("Wrong JSON. Make this error msg better at some point")
-            
             # add loss to total loss
-            loss += self.weights[i]*self.operations[i](*selected)
+            loss += self.weights[i]*self.operations[i](**kwargs)
             
         return loss
+
 
 class PearsonCorrelationLoss: # Stupid wrapper to homogeinize code with the imported classes
     def __init__(self):
