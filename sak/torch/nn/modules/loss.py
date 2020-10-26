@@ -134,9 +134,18 @@ class KLDivergence:
         return self.reduction(torch.exp(logvar) + mu**2 - 1. - logvar)
 
 class DiceLoss(torch.nn.Module):
-    def __init__(self, reduction: str = 'mean', eps: float = 1e-6):
+    def __init__(self, reduction: str = 'mean', eps: float = 1e-6, weight: torch.Tensor = None):
         # Epsilon (division by zero)
         self.eps = eps
+        if weight is None:
+            self.weight = None
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
 
         # Reduction
         if reduction == 'mean':   self.reduction = torch.mean
@@ -147,18 +156,31 @@ class DiceLoss(torch.nn.Module):
         
     def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None) -> torch.tensor:
         # Preprocess inputs
-        input = torch.flatten(input, start_dim=1)
-        target = torch.flatten(target, start_dim=1)
+        input = torch.flatten(input, start_dim=2)
+        target = torch.flatten(target, start_dim=2)
 
         # Compute dice loss (per sample)
-        intersection = (target*input).sum(dim=-1)
-        union = (target+input).sum(dim=-1)
+        intersection = (target*input).sum(-1)
+        union = (target+input).sum(-1)
+        
+        # Apply class weights (https://arxiv.org/pdf/1707.03237.pdf)
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            intersection = (intersection*self.weight)
+            union = (union*self.weight)
+            
+        # Average over channels
+        intersection = intersection.sum(-1)
+        union = union.sum(-1)
+        
+        # Compute loss
         loss = 1 - 2.*(intersection + self.eps)/(union + self.eps)
 
         # Apply sample weight to samples
         if sample_weight is not None:
             loss *= sample_weight
-        
+
         # Return reduced (batch) loss
         return self.reduction(loss)
 
