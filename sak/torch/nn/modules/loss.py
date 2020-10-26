@@ -1,8 +1,9 @@
-from typing import Tuple
+from typing import Tuple, Iterable
 import numpy as np
 import torch 
 import torch.nn
 import sak
+from torch.nn import Conv1d
 from torch.nn import MSELoss
 from torch.nn import BCELoss
 
@@ -167,6 +168,7 @@ class DiceLoss(torch.nn.Module):
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            self.weight = self.weight.to(target.device)
             intersection = (intersection*self.weight)
             union = (union*self.weight)
             
@@ -183,6 +185,114 @@ class DiceLoss(torch.nn.Module):
 
         # Return reduced (batch) loss
         return self.reduction(loss)
+
+
+class BoundDiceLoss(torch.nn.Module):
+    def __init__(self, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
+        super().__init__()
+        # Save inputs
+        self.reduction = reduction
+        self.eps = eps
+        self.weight = weight
+        self.kernel_size = kernel_size
+        
+        # Define auxiliary loss
+        self.loss = DiceLoss(reduction,eps,weight)
+        
+        # Define convolutional operation
+        self.conv_op = Conv1d(3,3,kernel_size,padding=(kernel_size-1)//2,bias=False)
+        
+        # Mark as non-trainable
+        for param in self.conv_op.parameters():
+            param.requires_grad = False
+
+        # Override weight
+        self.conv_op.weight[:,:,:] = 0.
+        self.conv_op.weight[0,0,0] = -1.
+        self.conv_op.weight[1,1,0] = -1.
+        self.conv_op.weight[2,2,0] = -1.
+        self.conv_op.weight[0,0,-1] = 1.
+        self.conv_op.weight[1,1,-1] = 1.
+        self.conv_op.weight[2,2,-1] = 1.
+
+    
+    def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None):
+        # Move operation to device
+        self.conv_op = self.conv_op.to(target.device)
+
+        # Retrieve boundaries
+        boundary_input = self.conv_op(input).abs()
+        boundary_target = self.conv_op(target).abs()
+
+        # Obtain dice loss between produced boundary masks
+        return self.loss(boundary_input, boundary_target, sample_weight)
+
+
+class InstanceLoss(torch.nn.Module):
+    def __init__(self, reduction: str = 'mean', weight: Iterable = None):
+        super().__init__()
+        if weight is None:
+            self.weight = None
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+        
+        # Define auxiliary loss
+        self.loss = MSELoss(reduction='none')
+        
+        # Define convolutional operation
+        self.conv_op = Conv1d(3,3,3,padding=1,bias=False)
+        
+        # Mark as non-trainable
+        for param in self.conv_op.parameters():
+            param.requires_grad = False
+
+        # Override weight
+        self.conv_op.weight[:,:,:] = 0.
+        self.conv_op.weight[0,0,0] = -1.
+        self.conv_op.weight[1,1,0] = -1.
+        self.conv_op.weight[2,2,0] = -1.
+        self.conv_op.weight[0,0,-1] = 1.
+        self.conv_op.weight[1,1,-1] = 1.
+        self.conv_op.weight[2,2,-1] = 1.
+
+    
+    def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None):
+        # Move operation to device
+        self.conv_op = self.conv_op.to(target.device)
+
+        # Retrieve boundaries
+        boundary_input = self.conv_op(input).abs()
+        boundary_target = self.conv_op(target).abs()
+
+        # Sum of elements alongside the spatial dimensions
+        boundary_input = torch.flatten(boundary_input, start_dim=2).sum(-1)/2
+        boundary_target = torch.flatten(boundary_target, start_dim=2).sum(-1)/2
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            boundary_input = boundary_input*self.weight
+            boundary_target = boundary_target*self.weight
+
+        # Obtain per-sample loss
+        loss = self.loss(boundary_input, boundary_target)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Obtain loss
+        return self.reduction(loss)
+
 
 # class KLDivergence:
 #     def __init__(self, reduction='mean', batch_size=required, input_shape=required, **kwargs):
