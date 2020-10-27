@@ -5,15 +5,15 @@ import pickle
 import importlib
 
 # Data loader to un-clutter code    
-def load_data(file, dtype=int):
+def load_data(file, dtype=int,start_dim=1):
     dic = dict()
     with open(file) as f:
         text = list(f)
     for line in text:
         line = line.replace(" ","").replace("\n","").replace(",,","").replace("'","")
         if line[-1] == ",": line = line[:-1]
-        head = line.split(",")[0]
-        tail = line.split(",")[1:]
+        head = ",".join(line.split(",")[:start_dim])
+        tail = line.split(",")[start_dim:]
         if tail == [""]:
             tail = np.asarray([])
         else:
