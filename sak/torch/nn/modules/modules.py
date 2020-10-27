@@ -12,6 +12,7 @@ from torch.nn import AdaptiveAvgPool2d
 from torch.nn import ReLU
 from torch.nn.functional import interpolate
 from .composers import Sequential
+from .composers import Parallel
 from sak import class_selector
 from sak.__ops import required
 from sak.__ops import check_required
@@ -51,6 +52,32 @@ class PointWiseConv1d(Module):
 
         # Declare operation
         self.pointwise_conv = Conv1d(in_channels, out_channels, **kwargs)
+
+        # Initialize weights values
+        initializer = class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
+        initializer(self.pointwise_conv.weight)
+
+    def forward(self, x: Tensor) -> Tensor:
+        return self.pointwise_conv(x)
+
+
+class AttentionRefinementModule(Module):
+    def __init__(self, channels: int = required, **kwargs: dict):
+        super(AttentionRefinementModule, self).__init__()
+
+        # Check required inputs
+        check_required(self, {"channels":channels})
+
+        # Establish default inputs
+        self.operations = [
+            nn.AdaptiveAvgPool1d(1),
+            PointWiseConv1d(channels,channels),
+
+        ]
+        self.operations = Sequential(*self.operations)
+
+        # Declare operation
+        self.pointwise_conv = Parallel((Identity(),))
 
         # Initialize weights values
         initializer = class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
