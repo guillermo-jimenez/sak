@@ -1,15 +1,24 @@
 from torch import Tensor
 from torch.nn import Module
+from torch.nn import Identity
 from torch.nn import BatchNorm1d
 from torch.nn import BatchNorm2d
+from torch.nn import BatchNorm3d
 from torch.nn import Dropout2d
+from torch.nn import Dropout3d
 from torch.nn import Conv1d
 from torch.nn import Conv2d
+from torch.nn import Conv3d
 from torch.nn import ConvTranspose1d
 from torch.nn import ConvTranspose2d
+from torch.nn import ConvTranspose3d
 from torch.nn import AdaptiveAvgPool1d
 from torch.nn import AdaptiveAvgPool2d
+from torch.nn import AdaptiveAvgPool3d
+from torch.nn import Linear
+from torch.nn import Sigmoid
 from torch.nn import ReLU
+
 from torch.nn.functional import interpolate
 from .composers import Sequential
 from .composers import Parallel
@@ -70,7 +79,7 @@ class AttentionRefinementModule(Module):
 
         # Establish default inputs
         self.operations = [
-            nn.AdaptiveAvgPool1d(1),
+            AdaptiveAvgPool1d(1),
             PointWiseConv1d(channels,channels),
 
         ]
@@ -351,3 +360,146 @@ class SeparableConvTranspose2d(Module):
         h = self.pointwise_conv_transp(h)
         return h
 
+
+class SqueezeAndExcitationNd(Module):
+    def __init__(self, channels: int = required, reduction_factor: int = required, dim: int = required):
+        super(SqueezeAndExcitationNd, self).__init__()
+        # Dimensions
+        if dim == 1: self.pooling = AdaptiveAvgPool1d(1)
+        if dim == 2: self.pooling = AdaptiveAvgPool2d(1)
+        if dim == 3: self.pooling = AdaptiveAvgPool3d(1)
+        if dim not in [1,2,3]: raise ValueError("'{}' dimensions not allowed".format(dim))
+
+        # Rest of parameters
+        self.encoder = Linear(channels, channels//reduction_factor, bias=False)
+        self.relu = ReLU(inplace=True)
+        self.decoder = Linear(channels//reduction_factor, channels, bias=False)
+        self.sigmoid = Sigmoid()
+
+        # Check required inputs
+        check_required(self, {"channels":channels, "reduction_factor":reduction_factor})
+
+    def forward(self, x):
+        # Compute the squeeze tensor
+        squeeze_tensor = self.pooling(x)
+        squeeze_shape = squeeze_tensor.shape
+        squeeze_tensor = squeeze_tensor.squeeze()
+        squeeze_tensor = self.encoder(squeeze_tensor)
+        squeeze_tensor = self.relu(squeeze_tensor)
+        squeeze_tensor = self.decoder(squeeze_tensor)
+        squeeze_tensor = self.sigmoid(squeeze_tensor)
+        squeeze_tensor = squeeze_tensor.view(squeeze_shape)
+        
+        # Multiply by original tensor (will broadcast)
+        return x*squeeze_tensor
+
+class SqueezeAndExcitation1d(SqueezeAndExcitationNd):
+    def __init__(self, channels: int = required, reduction_factor: int = required):
+        super(SqueezeAndExcitation1d, self).__init__(channels, reduction_factor, dim=1)
+
+class SqueezeAndExcitation2d(SqueezeAndExcitationNd):
+    def __init__(self, channels: int = required, reduction_factor: int = required):
+        super(SqueezeAndExcitation2d, self).__init__(channels, reduction_factor, dim=2)
+
+class SqueezeAndExcitation3d(SqueezeAndExcitationNd):
+    def __init__(self, channels: int = required, reduction_factor: int = required):
+        super(SqueezeAndExcitation3d, self).__init__(channels, reduction_factor, dim=3)
+
+
+class PointwiseSqueezeAndExcitationNd(Module):
+    def __init__(self, channels: int = required, reduction_factor: int = required, dim: int = required):
+        super(PointwiseSqueezeAndExcitationNd, self).__init__()
+        if dim == 1: self.convolution = Conv1d(channels, 1, 1, bias=False)
+        if dim == 2: self.convolution = Conv2d(channels, 1, 1, bias=False)
+        if dim == 3: self.convolution = Conv3d(channels, 1, 1, bias=False)
+        if dim not in [1,2,3]: raise ValueError("'{}' dimensions not allowed".format(dim))
+
+        # Sigmoid operation
+        self.sigmoid = Sigmoid()
+
+        # Check required inputs
+        check_required(self, {"channels":channels, "reduction_factor":reduction_factor})
+
+    def forward(self, x):
+        squeeze = self.convolution(x)
+        squeeze = self.sigmoid(squeeze)
+        return x*squeeze
+
+class PointwiseSqueezeAndExcitation1d(PointwiseSqueezeAndExcitationNd):
+    def __init__(self, channels: int = required, reduction_factor: int = required):
+        super(PointwiseSqueezeAndExcitation1d, self).__init__(channels=channels, reduction_factor=reduction_factor, dim=1)
+
+class PointwiseSqueezeAndExcitation2d(PointwiseSqueezeAndExcitationNd):
+    def __init__(self, channels: int = required, reduction_factor: int = required):
+        super(PointwiseSqueezeAndExcitation2d, self).__init__(channels=channels, reduction_factor=reduction_factor, dim=2)
+
+class PointwiseSqueezeAndExcitation3d(PointwiseSqueezeAndExcitationNd):
+    def __init__(self, channels: int = required, reduction_factor: int = required):
+        super(PointwiseSqueezeAndExcitation3d, self).__init__(channels=channels, reduction_factor=reduction_factor, dim=3)
+
+
+class EfficientChannelAttentionNd(Module):
+    """Constructs a ECA module. Taken from "ECA-Net: Efficient Channel Attention for Deep Convolutional Neural Networks"
+    Args:
+        channels: Number of channels of the input feature map
+        kernel_size: Adaptive selection of kernel size
+    """
+    def __init__(self, channels: int = required, kernel_size: int = required, dim: int = required):
+        super(EfficientChannelAttentionNd, self).__init__()
+        if dim == 1: self.avg_pool = AdaptiveAvgPool1d(1)
+        if dim == 2: self.avg_pool = AdaptiveAvgPool2d(1)
+        if dim == 3: self.avg_pool = AdaptiveAvgPool3d(1)
+        if dim not in [1,2,3]: raise ValueError("'{}' dimensions not allowed".format(dim))
+
+        self.conv = Conv1d(1, 1, kernel_size=kernel_size, padding=(kernel_size - 1) // 2, bias=False) 
+        self.sigmoid = Sigmoid()
+
+        check_required(self, {"channels": channels, "kernel_size": kernel_size, "dim": dim})
+
+    def forward(self, x):
+        # feature descriptor on the global spatial information
+        y = self.avg_pool(x)
+        y_shape = y.shape
+        # Squeeze the tensor
+        y = y.squeeze()[...,None]
+        # Transpose the tensor
+        y = y.transpose(-1,-2)
+        # Two different branches of ECA module
+        y = self.conv(y)
+        # Transpose the tensor
+        y = y.transpose(-1,-2)
+        # Unsqueeze the tensor
+        y = y.view(y_shape)
+        # Multi-scale information fusion
+        y = self.sigmoid(y)
+        return x * y.expand_as(x)
+
+
+class EfficientChannelAttention1d(EfficientChannelAttentionNd):
+    """Constructs a ECA module. Taken from "ECA-Net: Efficient Channel Attention for Deep Convolutional Neural Networks"
+    Args:
+        channels: Number of channels of the input feature map
+        kernel_size: Adaptive selection of kernel size
+    """
+    def __init__(self, channels, kernel_size=3):
+        super(EfficientChannelAttention1d, self).__init__(channels=channels, kernel_size=kernel_size, dim=1)
+
+
+class EfficientChannelAttention2d(EfficientChannelAttentionNd):
+    """Constructs a ECA module. Taken from "ECA-Net: Efficient Channel Attention for Deep Convolutional Neural Networks"
+    Args:
+        channels: Number of channels of the input feature map
+        kernel_size: Adaptive selection of kernel size
+    """
+    def __init__(self, channels, kernel_size=3):
+        super(EfficientChannelAttention2d, self).__init__(channels=channels, kernel_size=kernel_size, dim=2)
+
+
+class EfficientChannelAttention3d(EfficientChannelAttentionNd):
+    """Constructs a ECA module. Taken from "ECA-Net: Efficient Channel Attention for Deep Convolutional Neural Networks"
+    Args:
+        channels: Number of channels of the input feature map
+        kernel_size: Adaptive selection of kernel size
+    """
+    def __init__(self, channels, kernel_size=3):
+        super(EfficientChannelAttention3d, self).__init__(channels=channels, kernel_size=kernel_size, dim=3)
