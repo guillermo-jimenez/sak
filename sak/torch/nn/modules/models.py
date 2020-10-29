@@ -272,7 +272,7 @@ class SelfAttention(Module):
         convolution["arguments"] = convolution.get("arguments", {})
         for arg in ["channels","in_channels","out_channels","kernel_size","padding","stride","dilation",
                     "groups","bias","padding_mode"]:
-            if arg in kwargs:
+            if (arg in kwargs) and (arg not in convolution["arguments"]):
                 convolution["arguments"][arg] = kwargs[arg]
         
         # Try to get default arguments for attention
