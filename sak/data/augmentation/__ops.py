@@ -5,12 +5,14 @@ import sak.signal
 import warnings
 import numpy as np
 
-def mixup(x1: np.ndarray, x2: np.ndarray, alpha: float = 1.0, beta: float = 1.0, axis = None, shuffle: bool = True, rng: Optional[ModuleType] = np.random):
+def mixup(x1: np.ndarray, x2: np.ndarray, alpha: float = 1.0, beta: float = 1.0, axis = None, shuffle: bool = True, rng: Union[np.random.RandomState, None] = None):
     """Adapted from original authors of paper "[1710.09412] mixup: Beyond Empirical Risk Minimization"
     GitHub: https://github.com/facebookresearch/mixup-cifar10/
     """
 
     # Compute lambda. If hyperparams are incorrect, your loss
+    if rng is None:
+        rng = np.random
     lmbda = rng.beta(alpha, beta)
 
     if axis is None:
