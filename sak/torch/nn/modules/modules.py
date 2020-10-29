@@ -391,7 +391,7 @@ class EfficientChannelAttentionNd(Module):
         elif dim == 3: self.avg_pool = AdaptiveAvgPool3d(1)
         else: raise ValueError("Invalid number of dimensions: {}".format(dim))
 
-        self.conv = Conv1d(1, 1, kernel_size=kernel_size, padding=(kernel_size - 1) // 2, bias=False) 
+        self.mapping = Conv1d(1, 1, kernel_size=kernel_size, padding=(kernel_size - 1) // 2, bias=False) 
         self.sigmoid = Sigmoid()
 
 
@@ -404,7 +404,7 @@ class EfficientChannelAttentionNd(Module):
         # Transpose the tensor
         y = y.transpose(-1,-2)
         # Two different branches of ECA module
-        y = self.conv(y)
+        y = self.mapping(y)
         # Transpose the tensor
         y = y.transpose(-1,-2)
         # Unsqueeze the tensor
