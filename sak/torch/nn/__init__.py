@@ -7,6 +7,8 @@ from .modules.modules import ImagePooling1d, PointwiseConv1d, DepthwiseConv1d, S
                              PointwiseConvTranspose2d, DepthwiseConvTranspose2d, SeparableConvTranspose2d, \
                              SqueezeAndExcitation1d, SqueezeAndExcitation2d, SqueezeAndExcitation3d, \
                              PointwiseSqueezeAndExcitation1d, PointwiseSqueezeAndExcitation2d, PointwiseSqueezeAndExcitation3d, \
-                             EfficientChannelAttention1d, EfficientChannelAttention2d, EfficientChannelAttention3d
+                             EfficientChannelAttention1d, EfficientChannelAttention2d, EfficientChannelAttention3d, \
+                             AdaptiveAvgPoolAttention1d, AdaptiveAvgPoolAttention2d, AdaptiveAvgPoolAttention3d, \
+                             PointwiseAttention1d, PointwiseAttention2d, PointwiseAttention3d
 from .modules.composers import ModelGraph, Sequential, Parallel
 from .modules.utils import Lambda, Concatenate, Regularization, Reparameterize, none, Add, Multiply, Squeeze, Unsqueeze, View, UnFlatten, Dropout1d

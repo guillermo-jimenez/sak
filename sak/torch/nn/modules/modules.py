@@ -460,21 +460,21 @@ class AdaptiveAvgPoolAttentionNd(Module):
         return x*pooled
 
 class AdaptiveAvgPoolAttention1d(AdaptiveAvgPoolAttentionNd):
-    def __init__(self, dim: int = required, **kwargs: dict):
+    def __init__(self, **kwargs: dict):
         super(AdaptiveAvgPoolAttention1d, self).__init__(dim = 1, **kwargs)
 
 class AdaptiveAvgPoolAttention2d(AdaptiveAvgPoolAttentionNd):
-    def __init__(self, dim: int = required, **kwargs: dict):
+    def __init__(self, **kwargs: dict):
         super(AdaptiveAvgPoolAttention2d, self).__init__(dim = 2, **kwargs)
 
 class AdaptiveAvgPoolAttention3d(AdaptiveAvgPoolAttentionNd):
-    def __init__(self, dim: int = required, **kwargs: dict):
+    def __init__(self, **kwargs: dict):
         super(AdaptiveAvgPoolAttention3d, self).__init__(dim = 3, **kwargs)
 
 
-class AttentionRefinementNd(Module):
+class PointwiseAttentionNd(Module):
     def __init__(self, channels: int = required, reduction_factor: int = required, dim: int = required, **kwargs: dict):
-        super(AttentionRefinementNd, self).__init__()
+        super(PointwiseAttentionNd, self).__init__()
         # Check required inputs
         check_required(self, {"channels":channels,"reduction_factor":reduction_factor,"dim":dim})
 
@@ -497,5 +497,17 @@ class AttentionRefinementNd(Module):
         attention = self.sigmoid(attention)
         
         # Multiply by original tensor (will broadcast)
-        return x*squeeze_tensor
+        return x*attention
+
+class PointwiseAttention1d(PointwiseAttentionNd):
+    def __init__(self, channels: int = required, reduction_factor: int = required, **kwargs: dict):
+        super(PointwiseAttention1d, self).__init__(channels, reduction_factor, dim = 1, **kwargs)
+
+class PointwiseAttention2d(PointwiseAttentionNd):
+    def __init__(self, channels: int = required, reduction_factor: int = required, **kwargs: dict):
+        super(PointwiseAttention2d, self).__init__(channels, reduction_factor, dim = 2, **kwargs)
+
+class PointwiseAttention3d(PointwiseAttentionNd):
+    def __init__(self, channels: int = required, reduction_factor: int = required, **kwargs: dict):
+        super(PointwiseAttention3d, self).__init__(channels, reduction_factor, dim = 3, **kwargs)
 
