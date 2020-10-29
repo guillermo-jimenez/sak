@@ -53,7 +53,7 @@ class ImagePoolingNd(Module):
             
         self.relu = ReLU(inplace=True)
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         size = x.shape[2:]
         x = self.pooling(x)
         x = self.convolution(x)
@@ -314,7 +314,7 @@ class SqueezeAndExcitationNd(Module):
         self.decoder = Linear(channels//reduction_factor, channels, bias=False)
         self.sigmoid = Sigmoid()
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         # Compute the squeeze tensor
         attention = self.pooling(x)
         shape = attention.shape
@@ -356,7 +356,7 @@ class PointwiseSqueezeAndExcitationNd(Module):
         # Sigmoid operation
         self.sigmoid = Sigmoid()
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         squeeze = self.convolution(x)
         squeeze = self.sigmoid(squeeze)
         return x*squeeze
@@ -395,7 +395,7 @@ class EfficientChannelAttentionNd(Module):
         self.sigmoid = Sigmoid()
 
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         # feature descriptor on the global spatial information
         y = self.avg_pool(x)
         y_shape = y.shape
@@ -489,7 +489,7 @@ class PointwiseAttentionNd(Module):
         self.decoder = PointwiseConvNd(max([1,channels//reduction_factor]), channels, dim = dim, **kwargs)
         self.sigmoid = Sigmoid()
 
-    def forward(self, x):
+    def forward(self, x: Tensor) -> Tensor:
         # Compute the squeeze tensor
         attention = self.pooling(x)
         attention = self.encoder(attention)
