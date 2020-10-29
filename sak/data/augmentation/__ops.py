@@ -1,14 +1,17 @@
+from typing import Union, Optional
+from types import ModuleType
 import sak
 import sak.signal
+import warnings
 import numpy as np
 
-def mixup(x1: np.ndarray, x2: np.ndarray, alpha: float = 1.0, beta: float = 1.0, axis = None, shuffle: bool = True):
+def mixup(x1: np.ndarray, x2: np.ndarray, alpha: float = 1.0, beta: float = 1.0, axis = None, shuffle: bool = True, rng: Optional[ModuleType] = np.random):
     """Adapted from original authors of paper "[1710.09412] mixup: Beyond Empirical Risk Minimization"
     GitHub: https://github.com/facebookresearch/mixup-cifar10/
     """
 
     # Compute lambda. If hyperparams are incorrect, your loss
-    lmbda = np.random.beta(alpha, beta)
+    lmbda = rng.beta(alpha, beta)
 
     if axis is None:
         axis = 0
@@ -20,7 +23,7 @@ def mixup(x1: np.ndarray, x2: np.ndarray, alpha: float = 1.0, beta: float = 1.0,
 
     # Permutation along data axis (allowing batch mixup)
     if shuffle:
-        index = np.random.permutation(np.arange(x2.shape[0])) # Compatible with pytorch
+        index = rng.permutation(np.arange(x2.shape[0])) # Compatible with pytorch
 
         # Mix datapoints. If shapes are incompatible, your loss
         xhat = lmbda * x1 + (1 - lmbda) * x2[index, :]
