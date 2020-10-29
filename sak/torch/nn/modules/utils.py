@@ -8,6 +8,7 @@ from torch import exp
 from torch import cat
 from torch import randn_like
 from torch.nn import Module
+from torch.nn import Dropout2d
 from .composers import Sequential
 from sak.__ops import required
 from sak.__ops import check_required
@@ -16,6 +17,23 @@ from sak.__ops import check_required
 Order of operations
 https://github.com/ducha-aiki/caffenet-benchmark/blob/master/batchnorm.md
 """
+
+class Dropout1d(Module):
+    """Applies one-dimensional spatial dropout"""
+    def __init__(self, p: [0., 1.], inplace: bool = False):
+        super(Dropout1d, self).__init__()
+        if (p < 0) or (p > 1):
+            raise ValueError("Invalid probability {} provided. Must be formatted in range [0,1]".format(p))
+        self.p = p
+        self.inplace = inplace
+        self.dropout = Dropout2d(self.p, self.inplace)
+    
+    def forward(self, x: Tensor) -> Tensor:
+        # add a dimension for 2D to work -> format BxCxHxW
+        x = x.unsqueeze(-1) 
+        x = self.dropout(x).squeeze(-1)
+        return x
+
 
 class Lambda(Module):
     def __init__(self, lmbda, *args, **kwargs):
