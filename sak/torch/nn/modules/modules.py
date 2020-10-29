@@ -82,9 +82,9 @@ class PointwiseConvNd(Module):
         check_required(self, {"in_channels":in_channels, "out_channels":out_channels, "dim":dim})
 
         # Establish default inputs
-        kwargs["groups"] = tuple([1]*dim)
-        kwargs["kernel_size"] = tuple([1]*dim)
-        kwargs["padding"] = tuple([0]*dim)
+        kwargs["groups"] = 1
+        kwargs["kernel_size"] = 1
+        kwargs["padding"] = 0
 
         # Declare operations
         if   dim == 1: self.pointwise_conv = Conv1d(in_channels, out_channels, **kwargs)
@@ -119,8 +119,8 @@ class DepthwiseConvNd(Module):
         check_required(self, {"in_channels":in_channels, "kernel_size":kernel_size, "dim":dim})
         
         # Establish default inputs
-        kwargs["groups"] = tuple([in_channels]*dim)
-        kwargs["padding"] = kwargs.get("padding", tuple([(kernel_size-1)//2]*dim))
+        kwargs["groups"] = in_channels
+        kwargs["padding"] = kwargs.get("padding", (kernel_size-1)//2)
         if "out_channels" in kwargs:
             kwargs.pop("out_channels")
 
@@ -194,9 +194,9 @@ class PointwiseConvTransposeNd(Module):
         check_required(self, {"in_channels":in_channels,"out_channels":out_channels,"dim":dim})
 
         # Establish default inputs
-        kwargs["groups"] = tuple([1]*dim)
-        kwargs["kernel_size"] = tuple([1]*dim)
-        kwargs["padding"] = tuple([0]*dim)
+        kwargs["groups"] = 1
+        kwargs["kernel_size"] = 1
+        kwargs["padding"] = 0
 
         # Declare operations
         if   dim == 1: self.pointwise_conv_transp = ConvTranspose1d(in_channels, out_channels, **kwargs)
@@ -231,8 +231,8 @@ class DepthwiseConvTransposeNd(Module):
         check_required(self, {"in_channels":in_channels, "kernel_size":kernel_size, "dim":dim})
         
         # Establish default inputs
-        kwargs["groups"] = tuple([in_channels]*dim)
-        kwargs["padding"] = kwargs.get("padding", tuple([(kernel_size-1)//2]*dim))
+        kwargs["groups"] = in_channels
+        kwargs["padding"] = kwargs.get("padding", (kernel_size-1)//2)
         if "out_channels" in kwargs:
             kwargs.pop("out_channels")
 
@@ -483,9 +483,10 @@ class PointwiseAttentionNd(Module):
         elif dim == 2: self.pooling = AdaptiveAvgPool2d(1)
         elif dim == 3: self.pooling = AdaptiveAvgPool3d(1)
         else: raise ValueError("Invalid number of dimensions: {}".format(dim))
-        self.encoder = PointwiseConvNd(channels, max([1,channels/reduction_factor]), dim = dim, **kwargs)
+
+        self.encoder = PointwiseConvNd(channels, max([1,channels//reduction_factor]), dim = dim, **kwargs)
         self.relu = ReLU(inplace=True)
-        self.decoder = PointwiseConvNd(max([1,channels/reduction_factor]), channels, dim = dim, **kwargs)
+        self.decoder = PointwiseConvNd(max([1,channels//reduction_factor]), channels, dim = dim, **kwargs)
         self.sigmoid = Sigmoid()
 
     def forward(self, x):
