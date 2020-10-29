@@ -1,6 +1,6 @@
 from torch.nn import *
 from .modules.loss import CompoundLoss, PearsonCorrelationLoss, KLD_MSE, KLD_BCE, KLDivergence, DiceLoss, BoundDiceLoss, InstanceLoss
-from .modules.models import CNN, DNN, DCC, Residual
+from .modules.models import CNN, DNN, DCC, Residual, SelfAttention
 from .modules.modules import ImagePooling1d,                  ImagePooling2d,                  ImagePooling3d, \
                              PointwiseConv1d,                 PointwiseConv2d,                 PointwiseConv3d, \
                              DepthwiseConv1d,                 DepthwiseConv2d,                 DepthwiseConv3d, \

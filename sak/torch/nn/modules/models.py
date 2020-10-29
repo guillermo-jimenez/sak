@@ -44,7 +44,11 @@ class CNN(Module):
         # Store inputs
         self.channels = channels
         self.operation = class_selector(operation["class"])
-        self.operation_params = operation.get("arguments",{"kernel_size" : 3, "padding" : 1})
+        self.operation_params = operation.get("arguments",{})
+        if "kernel_size" not in self.operation_params:
+            self.operation_params["kernel_size"] = 3
+        if "padding" not in self.operation_params:
+            self.operation_params["padding"] = 1
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
         self.preoperation = preoperation
@@ -167,7 +171,11 @@ class DCC(Module):
         self.in_channels = in_channels
         self.out_channels = out_channels
         self.operation = class_selector(operation["class"])
-        self.operation_params = operation.get("arguments",{"kernel_size" : 3, "padding" : 1})
+        self.operation_params = operation.get("arguments",{})
+        if "kernel_size" not in self.operation_params:
+            self.operation_params["kernel_size"] = 3
+        if "padding" not in self.operation_params:
+            self.operation_params["padding"] = 1
         self.include_input = include_input
         self.regularization = regularization
         self.regularize_extrema = regularize_extrema
@@ -255,4 +263,30 @@ class Residual(Module):
         h = self.residual_operation(x,h)
 
         return h
+
+
+class SelfAttention(Module):
+    def __init__(self, convolution: dict = required, attention: dict = required, **kwargs):
+        super(SelfAttention, self).__init__()
+        # Map all input arguments to convolution's arguments
+        convolution["arguments"] = convolution.get("arguments", {})
+        for arg in ["channels","in_channels","out_channels","kernel_size","padding","stride","dilation",
+                    "groups","bias","padding_mode"]:
+            if arg in kwargs:
+                convolution["arguments"][arg] = kwargs[arg]
+        
+        # Try to get default arguments for attention
+        attention["arguments"] = attention.get("arguments", {})
+        if ("out_channels" in convolution["arguments"]) and ("channels" not in attention["arguments"]):
+            attention["arguments"]["channels"] = convolution["arguments"]["out_channels"]
+        elif ("in_channels" in convolution["arguments"]) and ("channels" not in attention["arguments"]):
+            attention["arguments"]["channels"] = convolution["arguments"]["in_channels"]
+
+        # Define operations
+        self.convolution = class_selector(convolution["class"])(**convolution["arguments"])
+        self.attention = class_selector(attention["class"])(**attention["arguments"])
+
+    def forward(self, x):
+        x = self.convolution(x)
+        return x*self.attention(x)
 
