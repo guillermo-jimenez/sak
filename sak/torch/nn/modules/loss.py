@@ -7,6 +7,7 @@ from torch.nn import Conv1d
 from torch.nn import Conv2d
 from torch.nn import Conv3d
 from torch.nn import Sigmoid
+from torch.nn import L1Loss
 from torch.nn import MSELoss
 from torch.nn import BCELoss
 
@@ -241,7 +242,7 @@ class InstanceLoss(torch.nn.Module):
         elif reduction == 'none': self.reduction = lambda x: x
         
         # Define auxiliary loss
-        self.loss = MSELoss(reduction='none')
+        self.loss = L1Loss(reduction='none')
         
         # Define convolutional operation
         self.conv_op = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
@@ -252,7 +253,7 @@ class InstanceLoss(torch.nn.Module):
 
         # Override weights
         self.conv_op.weight[:,:,:] = 0.
-        for c in self.channels:
+        for c in range(self.channels):
             self.conv_op.weight[c,c,0] = -1.
             self.conv_op.weight[c,c,1] =  1.
 
@@ -312,7 +313,7 @@ class InstanceLoss2d(torch.nn.Module):
         
         # Define auxiliary loss
         self.sigmoid = Sigmoid()
-        self.loss = MSELoss(reduction='none')
+        self.loss = L1Loss(reduction='none')
         
         # Define convolutional operation
         self.conv_op   = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
@@ -365,7 +366,6 @@ class InstanceLoss2d(torch.nn.Module):
 
         # Obtain per-sample loss
         loss = (self.loss(input_structs_x,target_structs_x)+self.loss(input_structs_y,target_structs_y))/2
-        loss = loss.sqrt()
 
         # Apply sample weight to samples
         if sample_weight is not None:
