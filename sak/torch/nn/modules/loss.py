@@ -4,6 +4,9 @@ import torch
 import torch.nn
 import sak
 from torch.nn import Conv1d
+from torch.nn import Conv2d
+from torch.nn import Conv3d
+from torch.nn import Sigmoid
 from torch.nn import MSELoss
 from torch.nn import BCELoss
 
@@ -180,10 +183,12 @@ class DiceLoss(torch.nn.Module):
         return self.reduction(loss)
 
 
+
 class BoundDiceLoss(torch.nn.Module):
-    def __init__(self, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
         super().__init__()
         # Save inputs
+        self.channels = channels
         self.reduction = reduction
         self.eps = eps
         self.weight = weight
@@ -193,7 +198,7 @@ class BoundDiceLoss(torch.nn.Module):
         self.loss = DiceLoss(reduction,eps,weight)
         
         # Define convolutional operation
-        self.conv_op = Conv1d(3,3,kernel_size,padding=(kernel_size-1)//2,bias=False)
+        self.conv_op = Conv1d(self.channels,self.channels,kernel_size,padding=(kernel_size-1)//2,bias=False)
         
         # Mark as non-trainable
         for param in self.conv_op.parameters():
@@ -201,12 +206,9 @@ class BoundDiceLoss(torch.nn.Module):
 
         # Override weight
         self.conv_op.weight[:,:,:] = 0.
-        self.conv_op.weight[0,0,0] = -1.
-        self.conv_op.weight[1,1,0] = -1.
-        self.conv_op.weight[2,2,0] = -1.
-        self.conv_op.weight[0,0,-1] = 1.
-        self.conv_op.weight[1,1,-1] = 1.
-        self.conv_op.weight[2,2,-1] = 1.
+        for c in range(self.channels):
+            self.conv_op.weight[c,c, 0] = -1.
+            self.conv_op.weight[c,c,-1] =  1.
 
     
     def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None):
@@ -222,8 +224,9 @@ class BoundDiceLoss(torch.nn.Module):
 
 
 class InstanceLoss(torch.nn.Module):
-    def __init__(self, reduction: str = 'mean', weight: Iterable = None):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None):
         super().__init__()
+        self.channels = channels
         if weight is None:
             self.weight = None
         else:
@@ -241,20 +244,17 @@ class InstanceLoss(torch.nn.Module):
         self.loss = MSELoss(reduction='none')
         
         # Define convolutional operation
-        self.conv_op = Conv1d(3,3,3,padding=1,bias=False)
+        self.conv_op = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
         
         # Mark as non-trainable
         for param in self.conv_op.parameters():
             param.requires_grad = False
 
-        # Override weight
+        # Override weights
         self.conv_op.weight[:,:,:] = 0.
-        self.conv_op.weight[0,0,0] = -1.
-        self.conv_op.weight[1,1,0] = -1.
-        self.conv_op.weight[2,2,0] = -1.
-        self.conv_op.weight[0,0,-1] = 1.
-        self.conv_op.weight[1,1,-1] = 1.
-        self.conv_op.weight[2,2,-1] = 1.
+        for c in self.channels:
+            self.conv_op.weight[c,c,0] = -1.
+            self.conv_op.weight[c,c,1] =  1.
 
     
     def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None):
@@ -285,6 +285,96 @@ class InstanceLoss(torch.nn.Module):
 
         # Obtain loss
         return self.reduction(loss)
+
+
+class InstanceLoss2d(torch.nn.Module):
+    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', eps: float = 1e-6):
+        super().__init__()
+        # Save inputs
+        self.channels = channels
+        self.reduction = reduction
+        self.eps = eps
+        if weight is None:
+            self.weight = torch.ones((1,self.channels))
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+
+        # Check weights size
+        assert self.weight.size(-1) == channels, "The number of provided channels and the associated weights do not match"
+        
+        # Define auxiliary loss
+        self.sigmoid = Sigmoid()
+        self.loss = MSELoss(reduction='none')
+        
+        # Define convolutional operation
+        self.conv_op   = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.conv_op_x = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        self.conv_op_y = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        
+        # Mark as non-trainable
+        for param in self.conv_op.parameters():   param.requires_grad = False
+        for param in self.conv_op_x.parameters(): param.requires_grad = False
+        for param in self.conv_op_y.parameters(): param.requires_grad = False
+            
+        # Override weights to make sobel filters
+        self.conv_op.weight[...]   = 0.
+        self.conv_op_x.weight[...] = 0.
+        self.conv_op_y.weight[...] = 0.
+        for c in range(self.channels):
+            # 1d
+            self.conv_op.weight[c,c,0]     = -1.
+            self.conv_op.weight[c,c,1]     =  1.
+            # 2d - x
+            self.conv_op_x.weight[c,c,0,0] = -1.
+            self.conv_op_x.weight[c,c,1,0] =  1.
+            # 2d - y
+            self.conv_op_y.weight[c,c,0,0] = -1.
+            self.conv_op_y.weight[c,c,0,1] =  1.
+
+    
+    def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None):
+        # Obtain number of structures of the target
+        target_bound_x   = self.conv_op_x(target).abs()
+        target_bound_y   = self.conv_op_y(target).abs()
+        target_structs_x = self.conv_op(target_bound_x.sum(-2)).abs().sum(-1)/4
+        target_structs_y = self.conv_op(target_bound_y.sum(-1)).abs().sum(-1)/4
+
+        # Obtain number of structures of the input
+        input_sigmoid    = self.sigmoid((input-0.5)*25) # Rule of thumb for dividing the classes as much as possible
+        input_bound_x    = self.conv_op_x(input_sigmoid).abs()
+        input_bound_y    = self.conv_op_y(input_sigmoid).abs()
+        input_structs_x  = self.conv_op(input_bound_x.sum(-2)).abs().sum(-1)/4
+        input_structs_y  = self.conv_op(input_bound_y.sum(-1)).abs().sum(-1)/4
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            input_structs_x  =  input_structs_x*self.weight
+            input_structs_y  =  input_structs_y*self.weight
+            target_structs_x = target_structs_x*self.weight
+            target_structs_y = target_structs_y*self.weight
+
+        # Obtain per-sample loss
+        loss = (self.loss(input_structs_x,target_structs_x)+self.loss(input_structs_y,target_structs_y))/2
+        loss = loss.sqrt()
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Apply reduction
+        return self.reduction(loss)
+
+
 
 
 # class KLDivergence:
