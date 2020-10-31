@@ -47,31 +47,15 @@ class PearsonCorrelationLoss: # Stupid wrapper to homogeinize code with the impo
     def __init__(self):
         pass
 
-    def __call__(self, X_pred: torch.Tensor, X: torch.tensor) -> torch.Tensor:
+    def __call__(self, X_pred: torch.Tensor, X: torch.Tensor) -> torch.Tensor:
         """https://discuss.pytorch.org/t/use-pearson-correlation-coefficient-as-cost-function/8739"""
         vX_pred = X_pred - torch.mean(X_pred)
         vX = X - torch.mean(X)
 
         return torch.sum(vX_pred * vX) / (torch.sqrt(torch.sum(vX_pred ** 2)) * torch.sqrt(torch.sum(vX ** 2)))
 
-# def KLD_MSE(reduction='mean'):
-#     def loss(X_pred: torch.Tensor, X: torch.Tensor, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
-#         # BCE = torch.nn.functional.binary_cross_entropy(X_pred, X.view(-1, 1024), reduction='mean')
-#         # BCE = torch.nn.functional.binary_cross_entropy(X_pred, X.view(-1, 1024), reduction='mean')
-#         # BCE = torch.nn.functional.mse_loss(X_pred, X.view(-1, 1024), reduction='mean')
-#         # BCE = torch.nn.functional.mse_loss(X_pred, X.view(-1, 1024), reduction='mean')
-
-#         # see Appendix B from VAE paper:
-#         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
-#         # https://arxiv.org/abs/1312.6114
-#         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
-#         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
-
-#         return BCE + KLD
-#     return loss
-
 class KLD_MSE:
-    def __init__(self, reduction='mean', beta=0.01, **kwargs):
+    def __init__(self, reduction: str = 'mean', beta: float = 0.01, **kwargs):
         self.reduction = reduction
         self.beta = beta
 
@@ -85,7 +69,7 @@ class KLD_MSE:
         return mse + self.beta*kl
 
 class KLD_BCE:
-    def __init__(self, reduction='mean', beta=0.01, **kwargs):
+    def __init__(self, reduction: str = 'mean', beta: float = 0.01, **kwargs):
         self.reduction = reduction
         self.beta = beta
 
@@ -99,7 +83,7 @@ class KLD_BCE:
         return bce + self.beta*kl
 
 class KLDivergence:
-    def __init__(self, reduction='torch.mean', **kwargs):
+    def __init__(self, reduction: str = 'torch.mean', **kwargs):
         # Mimic pytorch reductions (https://github.com/pytorch/pytorch/blob/master/torch/nn/modules/loss.py#L373)
         # Preprocess input
         reduction = reduction.lower()
@@ -152,7 +136,7 @@ class DiceLoss(torch.nn.Module):
 
         super().__init__()
         
-    def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None) -> torch.tensor:
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None) -> torch.tensor:
         # Preprocess inputs
         input = torch.flatten(input, start_dim=2)
         target = torch.flatten(target, start_dim=2)
@@ -212,7 +196,7 @@ class BoundDiceLoss(torch.nn.Module):
             self.conv_op.weight[c,c,-1] =  1.
 
     
-    def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None):
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
         self.conv_op = self.conv_op.to(target.device)
 
@@ -225,7 +209,7 @@ class BoundDiceLoss(torch.nn.Module):
 
 
 class InstanceLoss(torch.nn.Module):
-    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10):
         super().__init__()
         self.channels = channels
         if weight is None:
@@ -242,43 +226,53 @@ class InstanceLoss(torch.nn.Module):
         elif reduction == 'none': self.reduction = lambda x: x
         
         # Define auxiliary loss
+        self.threshold = threshold
+        self.sigmoid = Sigmoid()
         self.loss = L1Loss(reduction='none')
         
         # Define convolutional operation
-        self.conv_op = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.sobel = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
         
         # Mark as non-trainable
-        for param in self.conv_op.parameters():
+        for param in self.sobel.parameters():
             param.requires_grad = False
 
         # Override weights
-        self.conv_op.weight[:,:,:] = 0.
+        self.sobel.weight[:,:,:] = 0.
         for c in range(self.channels):
-            self.conv_op.weight[c,c,0] = -1.
-            self.conv_op.weight[c,c,1] =  1.
+            self.sobel.weight[c,c,0] = -1.
+            self.sobel.weight[c,c,1] =  1.
 
     
-    def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None):
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
-        self.conv_op = self.conv_op.to(target.device)
+        self.sobel = self.sobel.to(target.device)
+
+        # Obtain sigmoid-ed input and target
+        input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
 
         # Retrieve boundaries
-        boundary_input = self.conv_op(input).abs()
-        boundary_target = self.conv_op(target).abs()
+        input_boundary = self.sobel(input_sigmoid).abs()
+        target_boundary = self.sobel(target_sigmoid).abs()
+
+        # Obtain sigmoid-ed input and target
+        input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        target_boundary = self.sigmoid((target_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
 
         # Sum of elements alongside the spatial dimensions
-        boundary_input = torch.flatten(boundary_input, start_dim=2).sum(-1)/2
-        boundary_target = torch.flatten(boundary_target, start_dim=2).sum(-1)/2
+        input_elements = torch.flatten(input_boundary, start_dim=2).sum(-1)/2
+        target_elements = torch.flatten(target_boundary, start_dim=2).sum(-1)/2
 
         # Apply class weights
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
-            boundary_input = boundary_input*self.weight
-            boundary_target = boundary_target*self.weight
+            input_elements = input_elements*self.weight
+            target_elements = target_elements*self.weight
 
         # Obtain per-sample loss
-        loss = self.loss(boundary_input, boundary_target)
+        loss = self.loss(input_elements, target_elements)
 
         # Apply sample weight to samples
         if sample_weight is not None:
@@ -289,12 +283,11 @@ class InstanceLoss(torch.nn.Module):
 
 
 class InstanceLoss2d(torch.nn.Module):
-    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', eps: float = 1e-6):
+    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10):
         super().__init__()
         # Save inputs
         self.channels = channels
-        self.reduction = reduction
-        self.eps = eps
+        self.threshold = threshold
         if weight is None:
             self.weight = torch.ones((1,self.channels))
         else:
@@ -316,44 +309,58 @@ class InstanceLoss2d(torch.nn.Module):
         self.loss = L1Loss(reduction='none')
         
         # Define convolutional operation
-        self.conv_op   = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
-        self.conv_op_x = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
-        self.conv_op_y = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
-        
+        self.sobel  = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.sobelx = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        self.sobely = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+
         # Mark as non-trainable
-        for param in self.conv_op.parameters():   param.requires_grad = False
-        for param in self.conv_op_x.parameters(): param.requires_grad = False
-        for param in self.conv_op_y.parameters(): param.requires_grad = False
-            
+        for param in self.sobel.parameters():  param.requires_grad = False
+        for param in self.sobelx.parameters(): param.requires_grad = False
+        for param in self.sobely.parameters(): param.requires_grad = False
+
         # Override weights to make sobel filters
-        self.conv_op.weight[...]   = 0.
-        self.conv_op_x.weight[...] = 0.
-        self.conv_op_y.weight[...] = 0.
+        self.sobel.weight[...]  = 0.
+        self.sobelx.weight[...] = 0.
+        self.sobely.weight[...] = 0.
         for c in range(self.channels):
-            # 1d
-            self.conv_op.weight[c,c,0]     = -1.
-            self.conv_op.weight[c,c,1]     =  1.
-            # 2d - x
-            self.conv_op_x.weight[c,c,0,0] = -1.
-            self.conv_op_x.weight[c,c,1,0] =  1.
-            # 2d - y
-            self.conv_op_y.weight[c,c,0,0] = -1.
-            self.conv_op_y.weight[c,c,0,1] =  1.
+            # border
+            self.sobel.weight[c,c,0]    = -1.
+            self.sobel.weight[c,c,1]    =  1.
+            # x
+            self.sobelx.weight[c,c,0,0] = -1.
+            self.sobelx.weight[c,c,1,0] =  1.
+            # y
+            self.sobely.weight[c,c,0,0] = -1.
+            self.sobely.weight[c,c,0,1] =  1.
 
     
-    def forward(self, input: torch.tensor, target: torch.tensor, sample_weight: torch.tensor = None):
-        # Obtain number of structures of the target
-        target_bound_x   = self.conv_op_x(target).abs()
-        target_bound_y   = self.conv_op_y(target).abs()
-        target_structs_x = self.conv_op(target_bound_x.sum(-2)).abs().sum(-1)/4
-        target_structs_y = self.conv_op(target_bound_y.sum(-1)).abs().sum(-1)/4
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
+        # Move operation to device
+        self.sobel  =  self.sobel.to(target.device)
+        self.sobelx = self.sobelx.to(target.device)
+        self.sobely = self.sobely.to(target.device)
 
+        # Obtain sigmoid-ed input and target
+        input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        
+        # Obtain number of structures of the target
+        target_bound_x   = self.sobelx(target_sigmoid).abs()
+        target_bound_x   = self.sigmoid((target_bound_x-0.5)*self.threshold)
+        target_structs_x = self.sobel(target_bound_x.sum(-2)).abs().sum(-1)/4
+        
+        target_bound_y   = self.sobely(target_sigmoid).abs()
+        target_bound_y   = self.sigmoid((target_bound_y-0.5)*self.threshold)
+        target_structs_y = self.sobel(target_bound_y.sum(-1)).abs().sum(-1)/4
+        
         # Obtain number of structures of the input
-        input_sigmoid    = self.sigmoid((input-0.5)*25) # Rule of thumb for dividing the classes as much as possible
-        input_bound_x    = self.conv_op_x(input_sigmoid).abs()
-        input_bound_y    = self.conv_op_y(input_sigmoid).abs()
-        input_structs_x  = self.conv_op(input_bound_x.sum(-2)).abs().sum(-1)/4
-        input_structs_y  = self.conv_op(input_bound_y.sum(-1)).abs().sum(-1)/4
+        input_bound_x    = self.sobelx(input_sigmoid).abs()
+        input_bound_x    = self.sigmoid((input_bound_x-0.5)*self.threshold)
+        input_structs_x  = self.sobel(input_bound_x.sum(-2)).abs().sum(-1)/4
+        
+        input_bound_y    = self.sobely(input_sigmoid).abs()
+        input_bound_y    = self.sigmoid((input_bound_y-0.5)*self.threshold)
+        input_structs_y  = self.sobel(input_bound_y.sum(-1)).abs().sum(-1)/4
 
         # Apply class weights
         if self.weight is not None:
@@ -363,16 +370,17 @@ class InstanceLoss2d(torch.nn.Module):
             input_structs_y  =  input_structs_y*self.weight
             target_structs_x = target_structs_x*self.weight
             target_structs_y = target_structs_y*self.weight
-
-        # Obtain per-sample loss
+        
+        # Retrieve final loss
         loss = (self.loss(input_structs_x,target_structs_x)+self.loss(input_structs_y,target_structs_y))/2
 
         # Apply sample weight to samples
         if sample_weight is not None:
             loss *= sample_weight
 
-        # Apply reduction
+        # Obtain per-sample loss
         return self.reduction(loss)
+
 
 
 
@@ -411,3 +419,20 @@ class InstanceLoss2d(torch.nn.Module):
 #         return self.reduction(torch.exp(logvar) + mu**2 - 1. - logvar)
 #         # return reduction(-0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp()))
 #         # return torch.sum(torch.exp(logvar) + mu**2 - 1. - logvar)/(self.batch_size*self.input_shape)
+
+# def KLD_MSE(reduction='mean'):
+#     def loss(X_pred: torch.Tensor, X: torch.Tensor, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+#         # BCE = torch.nn.functional.binary_cross_entropy(X_pred, X.view(-1, 1024), reduction='mean')
+#         # BCE = torch.nn.functional.binary_cross_entropy(X_pred, X.view(-1, 1024), reduction='mean')
+#         # BCE = torch.nn.functional.mse_loss(X_pred, X.view(-1, 1024), reduction='mean')
+#         # BCE = torch.nn.functional.mse_loss(X_pred, X.view(-1, 1024), reduction='mean')
+
+#         # see Appendix B from VAE paper:
+#         # Kingma and Welling. Auto-Encoding Variational Bayes. ICLR, 2014
+#         # https://arxiv.org/abs/1312.6114
+#         # 0.5 * sum(1 + log(sigma^2) - mu^2 - sigma^2)
+#         KLD = -0.5 * torch.sum(1 + logvar - mu.pow(2) - logvar.exp())
+
+#         return BCE + KLD
+#     return loss
+
