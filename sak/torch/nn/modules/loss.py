@@ -282,6 +282,87 @@ class InstanceLoss(torch.nn.Module):
         return self.reduction(loss)
 
 
+class F1InstanceLoss(torch.nn.Module):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10):
+        super().__init__()
+        self.channels = channels
+        if weight is None:
+            self.weight = None
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+        
+        # Define auxiliary loss
+        self.threshold = threshold
+        self.sigmoid = Sigmoid()
+        
+        # Define convolutional operation
+        self.sobel = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        
+        # Mark as non-trainable
+        for param in self.sobel.parameters():
+            param.requires_grad = False
+
+        # Override weights
+        self.sobel.weight[:,:,:] = 0.
+        for c in range(self.channels):
+            self.sobel.weight[c,c,0] = -1.
+            self.sobel.weight[c,c,1] =  1.
+
+    
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
+        # Move operation to device
+        self.sobel = self.sobel.to(target.device)
+
+        # Obtain sigmoid-ed input and target
+        input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+
+        # Retrieve boundaries
+        input_boundary = self.sobel(input_sigmoid).abs()
+        target_boundary = self.sobel(target_sigmoid).abs()
+
+        # Obtain sigmoid-ed input and target
+        input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        target_boundary = self.sigmoid((target_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+
+        # Sum of elements alongside the spatial dimensions
+        input_elements = torch.flatten(input_boundary, start_dim=2).sum(-1)/2
+        target_elements = torch.flatten(target_boundary, start_dim=2).sum(-1)/2
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            input_elements = input_elements*self.weight
+            target_elements = target_elements*self.weight
+
+        # Hack to get whether target_elements or input_elements is larger
+        gate = self.sigmoid(target_elements-input_elements)
+
+        # Basic metrics
+        truepositive  = (target_elements-gate*(target_elements-input_elements)).abs()
+        falsepositive = self.sigmoid(input_elements-target_elements)*(input_elements-target_elements).abs()
+        falsenegative = self.sigmoid(target_elements-input_elements)*(target_elements-input_elements).abs()
+
+        # F1 loss
+        loss = 1-(2*truepositive + 1)/(2*truepositive + falsepositive + falsenegative + 1)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Obtain loss
+        return self.reduction(loss)
+
+
 class InstanceLoss2d(torch.nn.Module):
     def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10):
         super().__init__()
@@ -380,6 +461,122 @@ class InstanceLoss2d(torch.nn.Module):
 
         # Obtain per-sample loss
         return self.reduction(loss)
+
+
+class F1InstanceLoss2d(torch.nn.Module):
+    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10):
+        super().__init__()
+        # Save inputs
+        self.channels = channels
+        self.threshold = threshold
+        if weight is None:
+            self.weight = torch.ones((1,self.channels))
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+
+        # Check weights size
+        assert self.weight.size(-1) == channels, "The number of provided channels and the associated weights do not match"
+        
+        # Define auxiliary loss
+        self.sigmoid = Sigmoid()
+        
+        # Define convolutional operation
+        self.sobel  = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.sobelx = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        self.sobely = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+
+        # Mark as non-trainable
+        for param in self.sobel.parameters():  param.requires_grad = False
+        for param in self.sobelx.parameters(): param.requires_grad = False
+        for param in self.sobely.parameters(): param.requires_grad = False
+
+        # Override weights to make sobel filters
+        self.sobel.weight[...]  = 0.
+        self.sobelx.weight[...] = 0.
+        self.sobely.weight[...] = 0.
+        for c in range(self.channels):
+            # border
+            self.sobel.weight[c,c,0]    = -1.
+            self.sobel.weight[c,c,1]    =  1.
+            # x
+            self.sobelx.weight[c,c,0,0] = -1.
+            self.sobelx.weight[c,c,1,0] =  1.
+            # y
+            self.sobely.weight[c,c,0,0] = -1.
+            self.sobely.weight[c,c,0,1] =  1.
+
+    
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
+        # Move operation to device
+        self.sobel  =  self.sobel.to(target.device)
+        self.sobelx = self.sobelx.to(target.device)
+        self.sobely = self.sobely.to(target.device)
+
+        # Obtain sigmoid-ed input and target
+        input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        
+        # Obtain number of structures of the target
+        target_bound_x   = self.sobelx(target_sigmoid).abs()
+        target_bound_x   = self.sigmoid((target_bound_x-0.5)*self.threshold)
+        target_structs_x = self.sobel(target_bound_x.sum(-2)).abs().sum(-1)/4
+        
+        target_bound_y   = self.sobely(target_sigmoid).abs()
+        target_bound_y   = self.sigmoid((target_bound_y-0.5)*self.threshold)
+        target_structs_y = self.sobel(target_bound_y.sum(-1)).abs().sum(-1)/4
+        
+        # Obtain number of structures of the input
+        input_bound_x    = self.sobelx(input_sigmoid).abs()
+        input_bound_x    = self.sigmoid((input_bound_x-0.5)*self.threshold)
+        input_structs_x  = self.sobel(input_bound_x.sum(-2)).abs().sum(-1)/4
+        
+        input_bound_y    = self.sobely(input_sigmoid).abs()
+        input_bound_y    = self.sigmoid((input_bound_y-0.5)*self.threshold)
+        input_structs_y  = self.sobel(input_bound_y.sum(-1)).abs().sum(-1)/4
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            input_structs_x  =  input_structs_x*self.weight
+            input_structs_y  =  input_structs_y*self.weight
+            target_structs_x = target_structs_x*self.weight
+            target_structs_y = target_structs_y*self.weight
+        
+        # Hack to get whether target_structs or input_structs is larger
+        gate_x = self.sigmoid(target_structs_x-input_structs_x)
+        gate_y = self.sigmoid(target_structs_y-input_structs_y)
+
+        # Basic metrics
+        truepositive_x  = (target_structs_x-gate_x*(target_structs_x-input_structs_x)).abs()
+        truepositive_y  = (target_structs_y-gate_y*(target_structs_y-input_structs_y)).abs()
+        falsepositive_x = self.sigmoid(input_structs_x-target_structs_x)*(input_structs_x-target_structs_x).abs()
+        falsepositive_y = self.sigmoid(input_structs_y-target_structs_y)*(input_structs_y-target_structs_y).abs()
+        falsenegative_x = self.sigmoid(target_structs_x-input_structs_x)*(target_structs_x-input_structs_x).abs()
+        falsenegative_y = self.sigmoid(target_structs_y-input_structs_y)*(target_structs_y-input_structs_y).abs()
+
+        # F1 loss
+        loss = 1-(2*truepositive_x + 2*truepositive_y + 1)/(2*truepositive_x + falsepositive_x + falsenegative_x + 
+                                                             2*truepositive_y + falsepositive_y + falsenegative_y + 1)
+        
+        # Sum over channels
+        loss = loss.sum(-1)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Obtain per-sample loss
+        return self.reduction(loss)
+
 
 
 
