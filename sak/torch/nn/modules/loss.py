@@ -228,7 +228,7 @@ class InstanceLoss(torch.nn.Module):
         # Define auxiliary loss
         self.threshold = threshold
         self.sigmoid = Sigmoid()
-        self.loss = L1Loss(reduction='none')
+        self.loss = MSELoss(reduction='none')
         
         # Define convolutional operation
         self.sobel = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
@@ -272,7 +272,7 @@ class InstanceLoss(torch.nn.Module):
             target_elements = target_elements*self.weight
 
         # Obtain per-sample loss
-        loss = self.loss(input_elements, target_elements)
+        loss = self.loss(input_elements, target_elements)/target_elements
 
         # Apply sample weight to samples
         if sample_weight is not None:
