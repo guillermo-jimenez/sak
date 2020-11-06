@@ -304,7 +304,7 @@ class F1InstanceLoss(torch.nn.Module):
         self.sigmoid = Sigmoid()
         
         # Define convolutional operation
-        self.sobel = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.sobel = Conv1d(self.channels,self.channels,7,padding=1,bias=False)
         
         # Mark as non-trainable
         for param in self.sobel.parameters():
@@ -314,7 +314,7 @@ class F1InstanceLoss(torch.nn.Module):
         self.sobel.weight[:,:,:] = 0.
         for c in range(self.channels):
             self.sobel.weight[c,c,0] = -1.
-            self.sobel.weight[c,c,1] =  1.
+            self.sobel.weight[c,c,-1] =  1.
 
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
