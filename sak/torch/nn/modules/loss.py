@@ -272,7 +272,7 @@ class InstanceLoss(torch.nn.Module):
             target_elements = target_elements*self.weight
 
         # Obtain per-sample loss
-        loss = self.loss(input_elements, target_elements)/target_elements
+        loss = self.loss(input_elements, target_elements)
 
         # Apply sample weight to samples
         if sample_weight is not None:
