@@ -231,30 +231,30 @@ class InstanceLoss(torch.nn.Module):
         self.loss = MSELoss(reduction='none')
         
         # Define convolutional operation
-        self.sobel = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitt = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
         
         # Mark as non-trainable
-        for param in self.sobel.parameters():
+        for param in self.prewitt.parameters():
             param.requires_grad = False
 
         # Override weights
-        self.sobel.weight[:,:,:] = 0.
+        self.prewitt.weight[:,:,:] = 0.
         for c in range(self.channels):
-            self.sobel.weight[c,c, 0] = -1.
-            self.sobel.weight[c,c,-1] =  1.
+            self.prewitt.weight[c,c, 0] = -1.
+            self.prewitt.weight[c,c,-1] =  1.
 
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
-        self.sobel = self.sobel.to(target.device)
+        self.prewitt = self.prewitt.to(target.device)
 
         # Obtain sigmoid-ed input and target
         input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
         target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
 
         # Retrieve boundaries
-        input_boundary = self.sobel(input_sigmoid).abs()
-        target_boundary = self.sobel(target_sigmoid).abs()
+        input_boundary = self.prewitt(input_sigmoid).abs()
+        target_boundary = self.prewitt(target_sigmoid).abs()
 
         # Obtain sigmoid-ed input and target
         input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
@@ -304,30 +304,30 @@ class F1InstanceLoss(torch.nn.Module):
         self.sigmoid = Sigmoid()
         
         # Define convolutional operation
-        self.sobel = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitt = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
         
         # Mark as non-trainable
-        for param in self.sobel.parameters():
+        for param in self.prewitt.parameters():
             param.requires_grad = False
 
         # Override weights
-        self.sobel.weight[:,:,:] = 0.
+        self.prewitt.weight[:,:,:] = 0.
         for c in range(self.channels):
-            self.sobel.weight[c,c, 0] = -1.
-            self.sobel.weight[c,c,-1] =  1.
+            self.prewitt.weight[c,c, 0] = -1.
+            self.prewitt.weight[c,c,-1] =  1.
 
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
-        self.sobel = self.sobel.to(target.device)
+        self.prewitt = self.prewitt.to(target.device)
 
         # Obtain sigmoid-ed input and target
         input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
         target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
 
         # Retrieve boundaries
-        input_boundary = self.sobel(input_sigmoid).abs()
-        target_boundary = self.sobel(target_sigmoid).abs()
+        input_boundary = self.prewitt(input_sigmoid).abs()
+        target_boundary = self.prewitt(target_sigmoid).abs()
 
         # Obtain sigmoid-ed input and target
         input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
@@ -390,58 +390,58 @@ class InstanceLoss2d(torch.nn.Module):
         self.loss = L1Loss(reduction='none')
         
         # Define convolutional operation
-        self.sobel  = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
-        self.sobelx = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
-        self.sobely = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitt  = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewittx = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitty = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
 
         # Mark as non-trainable
-        for param in self.sobel.parameters():  param.requires_grad = False
-        for param in self.sobelx.parameters(): param.requires_grad = False
-        for param in self.sobely.parameters(): param.requires_grad = False
+        for param in self.prewitt.parameters():  param.requires_grad = False
+        for param in self.prewittx.parameters(): param.requires_grad = False
+        for param in self.prewitty.parameters(): param.requires_grad = False
 
-        # Override weights to make sobel filters
-        self.sobel.weight[...]  = 0.
-        self.sobelx.weight[...] = 0.
-        self.sobely.weight[...] = 0.
+        # Override weights to make Prewitt filters
+        self.prewitt.weight[...]  = 0.
+        self.prewittx.weight[...] = 0.
+        self.prewitty.weight[...] = 0.
         for c in range(self.channels):
             # border
-            self.sobel.weight[c,c, 0]    = -1.
-            self.sobel.weight[c,c,-1]    =  1.
+            self.prewitt.weight[c,c, 0]    = -1.
+            self.prewitt.weight[c,c,-1]    =  1.
             # x
-            self.sobelx.weight[c,c, 0,0] = -1.
-            self.sobelx.weight[c,c,-1,0] =  1.
+            self.prewittx.weight[c,c, 0,0] = -1.
+            self.prewittx.weight[c,c,-1,0] =  1.
             # y
-            self.sobely.weight[c,c,0, 0] = -1.
-            self.sobely.weight[c,c,0,-1] =  1.
+            self.prewitty.weight[c,c,0, 0] = -1.
+            self.prewitty.weight[c,c,0,-1] =  1.
 
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
-        self.sobel  =  self.sobel.to(target.device)
-        self.sobelx = self.sobelx.to(target.device)
-        self.sobely = self.sobely.to(target.device)
+        self.prewitt  =  self.prewitt.to(target.device)
+        self.prewittx = self.prewittx.to(target.device)
+        self.prewitty = self.prewitty.to(target.device)
 
         # Obtain sigmoid-ed input and target
         input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
         target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
         
         # Obtain number of structures of the target
-        target_bound_x   = self.sobelx(target_sigmoid).abs()
+        target_bound_x   = self.prewittx(target_sigmoid).abs()
         target_bound_x   = self.sigmoid((target_bound_x-0.5)*self.threshold)
-        target_structs_x = self.sobel(target_bound_x.sum(-2)).abs().sum(-1)/4
+        target_structs_x = self.prewitt(target_bound_x.sum(-2)).abs().sum(-1)/4
         
-        target_bound_y   = self.sobely(target_sigmoid).abs()
+        target_bound_y   = self.prewitty(target_sigmoid).abs()
         target_bound_y   = self.sigmoid((target_bound_y-0.5)*self.threshold)
-        target_structs_y = self.sobel(target_bound_y.sum(-1)).abs().sum(-1)/4
+        target_structs_y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/4
         
         # Obtain number of structures of the input
-        input_bound_x    = self.sobelx(input_sigmoid).abs()
+        input_bound_x    = self.prewittx(input_sigmoid).abs()
         input_bound_x    = self.sigmoid((input_bound_x-0.5)*self.threshold)
-        input_structs_x  = self.sobel(input_bound_x.sum(-2)).abs().sum(-1)/4
+        input_structs_x  = self.prewitt(input_bound_x.sum(-2)).abs().sum(-1)/4
         
-        input_bound_y    = self.sobely(input_sigmoid).abs()
+        input_bound_y    = self.prewitty(input_sigmoid).abs()
         input_bound_y    = self.sigmoid((input_bound_y-0.5)*self.threshold)
-        input_structs_y  = self.sobel(input_bound_y.sum(-1)).abs().sum(-1)/4
+        input_structs_y  = self.prewitt(input_bound_y.sum(-1)).abs().sum(-1)/4
 
         # Apply class weights
         if self.weight is not None:
@@ -489,58 +489,58 @@ class F1InstanceLoss2d(torch.nn.Module):
         self.sigmoid = Sigmoid()
         
         # Define convolutional operation
-        self.sobel  = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
-        self.sobelx = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
-        self.sobely = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitt  = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewittx = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitty = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
 
         # Mark as non-trainable
-        for param in self.sobel.parameters():  param.requires_grad = False
-        for param in self.sobelx.parameters(): param.requires_grad = False
-        for param in self.sobely.parameters(): param.requires_grad = False
+        for param in self.prewitt.parameters():  param.requires_grad = False
+        for param in self.prewittx.parameters(): param.requires_grad = False
+        for param in self.prewitty.parameters(): param.requires_grad = False
 
-        # Override weights to make sobel filters
-        self.sobel.weight[...]  = 0.
-        self.sobelx.weight[...] = 0.
-        self.sobely.weight[...] = 0.
+        # Override weights to make Prewitt filters
+        self.prewitt.weight[...]  = 0.
+        self.prewittx.weight[...] = 0.
+        self.prewitty.weight[...] = 0.
         for c in range(self.channels):
             # border
-            self.sobel.weight[c,c, 0]    = -1.
-            self.sobel.weight[c,c,-1]    =  1.
+            self.prewitt.weight[c,c, 0]    = -1.
+            self.prewitt.weight[c,c,-1]    =  1.
             # x
-            self.sobelx.weight[c,c, 0,0] = -1.
-            self.sobelx.weight[c,c,-1,0] =  1.
+            self.prewittx.weight[c,c, 0,0] = -1.
+            self.prewittx.weight[c,c,-1,0] =  1.
             # y
-            self.sobely.weight[c,c,0, 0] = -1.
-            self.sobely.weight[c,c,0,-1] =  1.
+            self.prewitty.weight[c,c,0, 0] = -1.
+            self.prewitty.weight[c,c,0,-1] =  1.
 
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
-        self.sobel  =  self.sobel.to(target.device)
-        self.sobelx = self.sobelx.to(target.device)
-        self.sobely = self.sobely.to(target.device)
+        self.prewitt  =  self.prewitt.to(target.device)
+        self.prewittx = self.prewittx.to(target.device)
+        self.prewitty = self.prewitty.to(target.device)
 
         # Obtain sigmoid-ed input and target
         input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
         target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
         
         # Obtain number of structures of the target
-        target_bound_x   = self.sobelx(target_sigmoid).abs()
+        target_bound_x   = self.prewittx(target_sigmoid).abs()
         target_bound_x   = self.sigmoid((target_bound_x-0.5)*self.threshold)
-        target_structs_x = self.sobel(target_bound_x.sum(-2)).abs().sum(-1)/4
+        target_structs_x = self.prewitt(target_bound_x.sum(-2)).abs().sum(-1)/4
         
-        target_bound_y   = self.sobely(target_sigmoid).abs()
+        target_bound_y   = self.prewitty(target_sigmoid).abs()
         target_bound_y   = self.sigmoid((target_bound_y-0.5)*self.threshold)
-        target_structs_y = self.sobel(target_bound_y.sum(-1)).abs().sum(-1)/4
+        target_structs_y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/4
         
         # Obtain number of structures of the input
-        input_bound_x    = self.sobelx(input_sigmoid).abs()
+        input_bound_x    = self.prewittx(input_sigmoid).abs()
         input_bound_x    = self.sigmoid((input_bound_x-0.5)*self.threshold)
-        input_structs_x  = self.sobel(input_bound_x.sum(-2)).abs().sum(-1)/4
+        input_structs_x  = self.prewitt(input_bound_x.sum(-2)).abs().sum(-1)/4
         
-        input_bound_y    = self.sobely(input_sigmoid).abs()
+        input_bound_y    = self.prewitty(input_sigmoid).abs()
         input_bound_y    = self.sigmoid((input_bound_y-0.5)*self.threshold)
-        input_structs_y  = self.sobel(input_bound_y.sum(-1)).abs().sum(-1)/4
+        input_structs_y  = self.prewitt(input_bound_y.sum(-1)).abs().sum(-1)/4
 
         # Apply class weights
         if self.weight is not None:
