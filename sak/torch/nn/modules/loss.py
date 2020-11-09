@@ -232,7 +232,7 @@ class InstanceLoss(torch.nn.Module):
         self.loss = MSELoss(reduction='none')
         
         # Define convolutional operation
-        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
+        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
         
         # Mark as non-trainable
         for param in self.prewitt.parameters():
@@ -306,7 +306,7 @@ class F1InstanceLoss(torch.nn.Module):
         self.sigmoid = Sigmoid()
         
         # Define convolutional operation
-        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
+        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
         
         # Mark as non-trainable
         for param in self.prewitt.parameters():
@@ -393,9 +393,9 @@ class InstanceLoss2d(torch.nn.Module):
         self.loss = MSELoss(reduction='none')
         
         # Define convolutional operation
-        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
-        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
-        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
+        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
 
         # Mark as non-trainable
         for param in self.prewitt.parameters():  param.requires_grad = False
@@ -493,9 +493,9 @@ class F1InstanceLoss2d(torch.nn.Module):
         self.sigmoid = Sigmoid()
         
         # Define convolutional operation
-        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
-        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
-        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
+        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
 
         # Mark as non-trainable
         for param in self.prewitt.parameters():  param.requires_grad = False
