@@ -347,7 +347,7 @@ class F1InstanceLoss(torch.nn.Module):
             target_elements = target_elements*self.weight
 
         # Hack to get whether target_elements or input_elements is larger
-        gate = self.sigmoid(self.threshold(target_elements-input_elements))
+        gate = self.sigmoid(self.threshold*(target_elements-input_elements))
 
         # Basic metrics
         truepositive  = (target_elements-gate*(target_elements-input_elements)).abs()
@@ -556,8 +556,8 @@ class F1InstanceLoss2d(torch.nn.Module):
             target_structs_y = target_structs_y*self.weight
         
         # Hack to get whether target_structs or input_structs is larger
-        gate_x = self.sigmoid(self.threshold(target_structs_x-input_structs_x))
-        gate_y = self.sigmoid(self.threshold(target_structs_y-input_structs_y))
+        gate_x = self.sigmoid(self.threshold*(target_structs_x-input_structs_x))
+        gate_y = self.sigmoid(self.threshold*(target_structs_y-input_structs_y))
 
         # Basic metrics
         truepositive_x  = (target_structs_x-gate_x*(target_structs_x-input_structs_x)).abs()
