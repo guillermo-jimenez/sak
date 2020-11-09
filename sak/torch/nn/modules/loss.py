@@ -336,8 +336,8 @@ class F1InstanceLoss(torch.nn.Module):
         target_boundary = self.sigmoid((target_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
 
         # Sum of elements alongside the spatial dimensions
-        input_elements = torch.flatten(input_boundary, start_dim=2).sum(-1)/2
-        target_elements = torch.flatten(target_boundary, start_dim=2).sum(-1)/2
+        input_elements = torch.flatten(input_boundary, start_dim=2).sum(-1)/4
+        target_elements = torch.flatten(target_boundary, start_dim=2).sum(-1)/4
 
         # Apply class weights
         if self.weight is not None:
@@ -347,7 +347,7 @@ class F1InstanceLoss(torch.nn.Module):
             target_elements = target_elements*self.weight
 
         # Hack to get whether target_elements or input_elements is larger
-        gate = self.sigmoid(self.threshold*(target_elements-input_elements))
+        gate = self.sigmoid((target_elements-input_elements)*self.threshold)
 
         # Basic metrics
         truepositive  = (target_elements-gate*(target_elements-input_elements)).abs()
@@ -556,8 +556,8 @@ class F1InstanceLoss2d(torch.nn.Module):
             target_structs_y = target_structs_y*self.weight
         
         # Hack to get whether target_structs or input_structs is larger
-        gate_x = self.sigmoid(self.threshold*(target_structs_x-input_structs_x))
-        gate_y = self.sigmoid(self.threshold*(target_structs_y-input_structs_y))
+        gate_x = self.sigmoid((target_structs_x-input_structs_x)*self.threshold)
+        gate_y = self.sigmoid((target_structs_y-input_structs_y)*self.threshold)
 
         # Basic metrics
         truepositive_x  = (target_structs_x-gate_x*(target_structs_x-input_structs_x)).abs()
