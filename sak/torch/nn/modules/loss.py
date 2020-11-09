@@ -390,7 +390,7 @@ class InstanceLoss2d(torch.nn.Module):
         # Define auxiliary loss
         self.kernel_size = kernel_size
         self.sigmoid = Sigmoid()
-        self.loss = L1Loss(reduction='none')
+        self.loss = MSELoss(reduction='none')
         
         # Define convolutional operation
         self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
