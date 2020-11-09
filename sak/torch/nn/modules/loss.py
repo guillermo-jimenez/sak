@@ -240,8 +240,8 @@ class InstanceLoss(torch.nn.Module):
         # Override weights
         self.sobel.weight[:,:,:] = 0.
         for c in range(self.channels):
-            self.sobel.weight[c,c,0] = -1.
-            self.sobel.weight[c,c,1] =  1.
+            self.sobel.weight[c,c, 0] = -1.
+            self.sobel.weight[c,c,-1] =  1.
 
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
@@ -313,8 +313,8 @@ class F1InstanceLoss(torch.nn.Module):
         # Override weights
         self.sobel.weight[:,:,:] = 0.
         for c in range(self.channels):
-            self.sobel.weight[c,c,0] = -1.
-            self.sobel.weight[c,c,1] =  1.
+            self.sobel.weight[c,c, 0] = -1.
+            self.sobel.weight[c,c,-1] =  1.
 
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
@@ -405,14 +405,14 @@ class InstanceLoss2d(torch.nn.Module):
         self.sobely.weight[...] = 0.
         for c in range(self.channels):
             # border
-            self.sobel.weight[c,c,0]    = -1.
-            self.sobel.weight[c,c,1]    =  1.
+            self.sobel.weight[c,c, 0]    = -1.
+            self.sobel.weight[c,c,-1]    =  1.
             # x
-            self.sobelx.weight[c,c,0,0] = -1.
-            self.sobelx.weight[c,c,1,0] =  1.
+            self.sobelx.weight[c,c, 0,0] = -1.
+            self.sobelx.weight[c,c,-1,0] =  1.
             # y
-            self.sobely.weight[c,c,0,0] = -1.
-            self.sobely.weight[c,c,0,1] =  1.
+            self.sobely.weight[c,c,0, 0] = -1.
+            self.sobely.weight[c,c,0,-1] =  1.
 
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
@@ -504,14 +504,14 @@ class F1InstanceLoss2d(torch.nn.Module):
         self.sobely.weight[...] = 0.
         for c in range(self.channels):
             # border
-            self.sobel.weight[c,c,0]    = -1.
-            self.sobel.weight[c,c,1]    =  1.
+            self.sobel.weight[c,c, 0]    = -1.
+            self.sobel.weight[c,c,-1]    =  1.
             # x
-            self.sobelx.weight[c,c,0,0] = -1.
-            self.sobelx.weight[c,c,1,0] =  1.
+            self.sobelx.weight[c,c, 0,0] = -1.
+            self.sobelx.weight[c,c,-1,0] =  1.
             # y
-            self.sobely.weight[c,c,0,0] = -1.
-            self.sobely.weight[c,c,0,1] =  1.
+            self.sobely.weight[c,c,0, 0] = -1.
+            self.sobely.weight[c,c,0,-1] =  1.
 
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
