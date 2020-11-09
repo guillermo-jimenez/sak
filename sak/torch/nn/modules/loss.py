@@ -347,12 +347,12 @@ class F1InstanceLoss(torch.nn.Module):
             target_elements = target_elements*self.weight
 
         # Hack to get whether target_elements or input_elements is larger
-        gate = self.sigmoid(target_elements-input_elements)
+        gate = self.sigmoid(self.threshold(target_elements-input_elements))
 
         # Basic metrics
         truepositive  = (target_elements-gate*(target_elements-input_elements)).abs()
-        falsepositive = self.sigmoid(input_elements-target_elements)*(input_elements-target_elements).abs()
-        falsenegative = self.sigmoid(target_elements-input_elements)*(target_elements-input_elements).abs()
+        falsepositive = (1-gate)*(input_elements-target_elements).abs()
+        falsenegative = gate*(target_elements-input_elements).abs()
 
         # F1 loss
         loss = 1-(2*truepositive + 1)/(2*truepositive + falsepositive + falsenegative + 1)
@@ -556,16 +556,16 @@ class F1InstanceLoss2d(torch.nn.Module):
             target_structs_y = target_structs_y*self.weight
         
         # Hack to get whether target_structs or input_structs is larger
-        gate_x = self.sigmoid(target_structs_x-input_structs_x)
-        gate_y = self.sigmoid(target_structs_y-input_structs_y)
+        gate_x = self.sigmoid(self.threshold(target_structs_x-input_structs_x))
+        gate_y = self.sigmoid(self.threshold(target_structs_y-input_structs_y))
 
         # Basic metrics
         truepositive_x  = (target_structs_x-gate_x*(target_structs_x-input_structs_x)).abs()
         truepositive_y  = (target_structs_y-gate_y*(target_structs_y-input_structs_y)).abs()
-        falsepositive_x = self.sigmoid(input_structs_x-target_structs_x)*(input_structs_x-target_structs_x).abs()
-        falsepositive_y = self.sigmoid(input_structs_y-target_structs_y)*(input_structs_y-target_structs_y).abs()
-        falsenegative_x = self.sigmoid(target_structs_x-input_structs_x)*(target_structs_x-input_structs_x).abs()
-        falsenegative_y = self.sigmoid(target_structs_y-input_structs_y)*(target_structs_y-input_structs_y).abs()
+        falsepositive_x = (1-gate_x)*(input_structs_x-target_structs_x).abs()
+        falsepositive_y = (1-gate_y)*(input_structs_y-target_structs_y).abs()
+        falsenegative_x = gate_x*(target_structs_x-input_structs_x).abs()
+        falsenegative_y = gate_y*(target_structs_y-input_structs_y).abs()
 
         # F1 loss
         loss = 1-(2*truepositive_x + 2*truepositive_y + 1)/(2*truepositive_x + falsepositive_x + falsenegative_x + 
