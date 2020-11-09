@@ -209,7 +209,7 @@ class BoundDiceLoss(torch.nn.Module):
 
 
 class InstanceLoss(torch.nn.Module):
-    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10, kernel_size: int = 3):
         super().__init__()
         self.channels = channels
         if weight is None:
@@ -227,11 +227,12 @@ class InstanceLoss(torch.nn.Module):
         
         # Define auxiliary loss
         self.threshold = threshold
+        self.kernel_size = kernel_size
         self.sigmoid = Sigmoid()
         self.loss = MSELoss(reduction='none')
         
         # Define convolutional operation
-        self.prewitt = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
         
         # Mark as non-trainable
         for param in self.prewitt.parameters():
@@ -283,7 +284,7 @@ class InstanceLoss(torch.nn.Module):
 
 
 class F1InstanceLoss(torch.nn.Module):
-    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10, kernel_size: int = 3):
         super().__init__()
         self.channels = channels
         if weight is None:
@@ -301,10 +302,11 @@ class F1InstanceLoss(torch.nn.Module):
         
         # Define auxiliary loss
         self.threshold = threshold
+        self.kernel_size = kernel_size
         self.sigmoid = Sigmoid()
         
         # Define convolutional operation
-        self.prewitt = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
         
         # Mark as non-trainable
         for param in self.prewitt.parameters():
@@ -364,7 +366,7 @@ class F1InstanceLoss(torch.nn.Module):
 
 
 class InstanceLoss2d(torch.nn.Module):
-    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10):
+    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10, kernel_size: int = 3):
         super().__init__()
         # Save inputs
         self.channels = channels
@@ -386,13 +388,14 @@ class InstanceLoss2d(torch.nn.Module):
         assert self.weight.size(-1) == channels, "The number of provided channels and the associated weights do not match"
         
         # Define auxiliary loss
+        self.kernel_size = kernel_size
         self.sigmoid = Sigmoid()
         self.loss = L1Loss(reduction='none')
         
         # Define convolutional operation
-        self.prewitt  = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
-        self.prewittx = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
-        self.prewitty = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
+        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
+        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
 
         # Mark as non-trainable
         for param in self.prewitt.parameters():  param.requires_grad = False
@@ -464,7 +467,7 @@ class InstanceLoss2d(torch.nn.Module):
 
 
 class F1InstanceLoss2d(torch.nn.Module):
-    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10):
+    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10, kernel_size: int = 3):
         super().__init__()
         # Save inputs
         self.channels = channels
@@ -486,12 +489,13 @@ class F1InstanceLoss2d(torch.nn.Module):
         assert self.weight.size(-1) == channels, "The number of provided channels and the associated weights do not match"
         
         # Define auxiliary loss
+        self.kernel_size = kernel_size
         self.sigmoid = Sigmoid()
         
         # Define convolutional operation
-        self.prewitt  = Conv1d(self.channels,self.channels,3,padding=1,bias=False)
-        self.prewittx = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
-        self.prewitty = Conv2d(self.channels,self.channels,3,padding=1,bias=False)
+        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
+        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
+        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=1,bias=False)
 
         # Mark as non-trainable
         for param in self.prewitt.parameters():  param.requires_grad = False
