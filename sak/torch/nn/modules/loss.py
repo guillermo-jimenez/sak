@@ -323,17 +323,9 @@ class F1InstanceLoss(torch.nn.Module):
         # Move operation to device
         self.prewitt = self.prewitt.to(target.device)
 
-        # Obtain sigmoid-ed input and target
-        input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-        target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-
         # Retrieve boundaries
-        input_boundary = self.prewitt(input_sigmoid).abs()
-        target_boundary = self.prewitt(target_sigmoid).abs()
-
-        # Obtain sigmoid-ed input and target
-        input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-        target_boundary = self.sigmoid((target_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        input_boundary = self.prewitt(input).abs()
+        target_boundary = self.prewitt(target).abs()
 
         # Sum of elements alongside the spatial dimensions
         input_elements = torch.flatten(input_boundary, start_dim=2).sum(-1)/4
@@ -346,16 +338,8 @@ class F1InstanceLoss(torch.nn.Module):
             input_elements = input_elements*self.weight
             target_elements = target_elements*self.weight
 
-        # Hack to get whether target_elements or input_elements is larger
-        gate = self.sigmoid((target_elements-input_elements)*self.threshold)
-
-        # Basic metrics
-        truepositive  = (target_elements-gate*(target_elements-input_elements)).abs()
-        falsepositive = (1-gate)*(input_elements-target_elements).abs()
-        falsenegative = gate*(target_elements-input_elements).abs()
-
-        # F1 loss
-        loss = 1-(2*truepositive + 1)/(2*truepositive + falsepositive + falsenegative + 1)
+        # Instance loss
+        loss = (target_elements-input_elements).abs()/(target_elements+input_elements)
 
         # Apply sample weight to samples
         if sample_weight is not None:
