@@ -323,17 +323,17 @@ class F1InstanceLoss(torch.nn.Module):
         # Move operation to device
         self.prewitt = self.prewitt.to(target.device)
 
-        # # Soften input
-        # input = self.sigmoid((input-0.5)*self.threshold)
-        # target = self.sigmoid((target-0.5)*self.threshold)
+        # Soften input
+        input = self.sigmoid((input-0.5)*self.threshold)
+        target = self.sigmoid((target-0.5)*self.threshold)
 
         # Retrieve boundaries
         input_boundary = self.prewitt(input).abs()
         target_boundary = self.prewitt(target).abs()
 
-        # # Obtain sigmoid-ed input and target
-        # input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-        # target_boundary = self.sigmoid((target_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        # Obtain sigmoid-ed input and target
+        input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        target_boundary = self.sigmoid((target_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
 
         # Sum of elements alongside the spatial dimensions
         input_elements = torch.flatten(input_boundary, start_dim=2).sum(-1)/4
