@@ -20,12 +20,12 @@ class RandomSpikes(object):
 
         # Manage inputs
         if self.period is None: 
-            period = np.random.randint(100,250,size=batch_size) # Rule of thumb
+            period = np.random.randint(100,250,size=batch_size,dtype=int) # Rule of thumb
         else: 
             period = np.array([period]*batch_size,astype=int)
         amplitude = np.random.rand(batch_size)*self.amplitude
         amplitude = (sample_max*torch.tensor(amplitude,dtype=x.dtype))[:,None,None]
-        period = period + np.random.randint(low=-period//4, high=period//4,size=batch_size)
+        period = period + np.random.randint(low=-period//4, high=period//4,size=batch_size,dtype=int)
         
         # Define a randomly initialized filter bank
         spikes = np.zeros((batch_size,channels,5,))
