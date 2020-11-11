@@ -25,7 +25,7 @@ class RandomSpikes(object):
             period = np.array([period]*batch_size,astype=int)
         amplitude = np.random.rand(batch_size)*self.amplitude
         amplitude = (sample_max*torch.tensor(amplitude,dtype=x.dtype))[:,None,None]
-        period = period + np.random.randint(low=-period//4, high=period//4,size=batch_size,dtype=int)
+        period = period + np.random.randint(low=-np.median(period)//4, high=np.median(period)//4,size=batch_size,dtype=int)
         
         # Define a randomly initialized filter bank
         spikes = np.zeros((batch_size,channels,5,))
