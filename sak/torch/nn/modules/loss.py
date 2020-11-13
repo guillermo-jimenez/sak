@@ -250,12 +250,12 @@ class InstanceLoss(torch.nn.Module):
         self.prewitt = self.prewitt.to(target.device)
 
         # Obtain sigmoid-ed input and target
-        input_sigmoid  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-        target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        input  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
+        target = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
 
         # Retrieve boundaries
-        input_boundary = self.prewitt(input_sigmoid).abs()
-        target_boundary = self.prewitt(target_sigmoid).abs()
+        input_boundary = self.prewitt(input).abs()
+        target_boundary = self.prewitt(target).abs()
 
         # Obtain sigmoid-ed input and target
         input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
