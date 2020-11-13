@@ -4,6 +4,9 @@ import numpy as np
 import pickle
 import importlib
 
+def as_tuple(*args) -> Tuple:
+    return args
+
 # Data loader to un-clutter code    
 def load_data(file, dtype=int,start_dim=1):
     dic = dict()
@@ -136,6 +139,8 @@ def class_selector(module_name: str, class_name: str = None):
         module_name = '.'.join(module_name.split('.')[:-1])
     if class_name == "None":
         class_name = class_name.lower()
+    if not module_name:
+        module_name = "builtins"
     m = importlib.import_module(module_name)
         # return the class, will raise AttributeError if class cannot be found
     return getattr(m, class_name)
