@@ -23,26 +23,22 @@ class AugmentationComposer(object):
     """Compose a random transform according to pre-specified config file"""
 
     def __init__(self, **dic):
-        # Apply data augmentation
-        transforms = []
-        for aug_type in dic['transforms']:
-            # Retrieve the augmentation object
-            cls = class_selector(aug_type)
-            # Initialize with the selected augmentation's arguments
-            obj = cls(*dic['transforms'][aug_type])
-            # Add instantiation to current transforms (must have __call__ defined over tensor)
-            transforms.append(obj)
-
-        if len(transforms) == 0:
-            self.augmentation = lambda x: x
-        else:
-            # Define the object that will disambiguate between transforms
-            transform_type = class_selector(dic['class'])
-            # Instantiate data augmentation
-            self.augmentation = transform_type(transforms, **dic.get('arguments',{}))
+        self.augmentation = self.__get_operation(dic)
 
     def __call__(self, *args: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
         return self.augmentation(*args)
+
+    def __get_operation(self, operation):
+        if "transforms" in operation:
+            ops = []
+            for transform in operation["transforms"]:
+                ops.append(self.__get_operation(transform))
+            return class_selector(operation["class"])(ops)
+        else:
+            if isinstance(operation["arguments"], list):
+                return class_selector(operation["class"])(*operation["arguments"])
+            elif isinstance(operation["arguments"], dict):
+                return class_selector(operation["class"])(**operation["arguments"])
 
 
 class AdditiveWhiteGaussianNoise(object):
