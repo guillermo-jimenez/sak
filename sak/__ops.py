@@ -63,6 +63,31 @@ def channel2index(channel: str, header=["I", "II", "III", "AVR", "AVL", "AVF", "
         raise ValueError("Channel {} not found in header with channels {}".format(channel, header))
     return np.where(np.array(header) == channel.upper())[0][0]
     
+def nested_caller(operation: dict):
+    # Check input
+    assert isinstance(operation, dict), "Only nested dictionaries can be used as input"
+    assert "class" in operation,        "Missing 'class' field in dictionary"
+    assert "arguments" in operation,    "Missing 'arguments' field in dictionary"
+    
+    # If the argument field has nested calls
+    if isinstance(operation["arguments"], dict):
+        for arg in operation["arguments"]:
+            if isinstance(operation["arguments"][arg], dict):
+                if ("class" in operation["arguments"][arg]):
+                    operation["arguments"][arg] = nested_caller(operation["arguments"][arg])
+    if isinstance(operation["arguments"], list):
+        for i,arg in enumerate(operation["arguments"]):
+            if isinstance(arg, dict):
+                if ("class" in arg):
+                    operation["arguments"][i] = nested_caller(arg)
+        
+    if isinstance(operation["arguments"], list):
+        return class_selector(operation["class"])(*operation["arguments"])
+    elif isinstance(operation["arguments"], dict):
+        return class_selector(operation["class"])(**operation["arguments"])
+    else:
+        return class_selector(operation["class"])(operation["arguments"])
+
 def get_tqdm(iterator: iter, type: str = "tqdm.tqdm", **kwargs) -> Any:
     try:
         iterator = class_selector(type)(iterator, **kwargs)
