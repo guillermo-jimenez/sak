@@ -526,8 +526,8 @@ class F1InstanceLoss2d(torch.nn.Module):
         target_elements_x = self.prewitt(target_bound_x.sum(-2)).abs().sum(-1)/(4**2)
         
         target_bound_y    = self.prewitty(target_sigmoid).abs()
-        target_bound_y   = self.sigmoid((target_bound_y-0.5)*self.threshold)
-        target_elements _y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/(4**2)
+        target_bound_y    = self.sigmoid((target_bound_y-0.5)*self.threshold)
+        target_elements_y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/(4**2)
         
         # Obtain number of structures of the input
         input_bound_x     = self.prewittx(input_sigmoid).abs()
