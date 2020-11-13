@@ -269,6 +269,7 @@ class InstanceLoss(torch.nn.Module):
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            self.weight = self.weight.to(target.device)
             input_elements = input_elements*self.weight
             target_elements = target_elements*self.weight
 
@@ -343,6 +344,7 @@ class F1InstanceLoss(torch.nn.Module):
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            self.weight = self.weight.to(target.device)
             input_elements = input_elements*self.weight
             target_elements = target_elements*self.weight
 
@@ -514,6 +516,7 @@ class InstanceLoss2d(torch.nn.Module):
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            self.weight = self.weight.to(target.device)
             input_elements_x  =  input_elements_x*self.weight
             input_elements_y  =  input_elements_y*self.weight
             target_elements_x = target_elements_x*self.weight
@@ -614,6 +617,7 @@ class F1InstanceLoss2d(torch.nn.Module):
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            self.weight = self.weight.to(target.device)
             input_elements_x  =  input_elements_x*self.weight
             input_elements_y  =  input_elements_y*self.weight
             target_elements_x = target_elements_x*self.weight
