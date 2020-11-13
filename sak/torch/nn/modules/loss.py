@@ -495,20 +495,20 @@ class InstanceLoss2d(torch.nn.Module):
         # Obtain number of structures of the target
         target_bound_x    = self.prewittx(target_sigmoid).abs()
         target_bound_x    = self.sigmoid((target_bound_x-0.5)*self.threshold)
-        target_elements_x = self.prewitt(target_bound_x.sum(-2)).abs().sum(-1)/4
+        target_elements_x = self.prewitt(target_bound_x.sum(-2)).abs().sum(-1)/(4**2)
         
         target_bound_y    = self.prewitty(target_sigmoid).abs()
         target_bound_y    = self.sigmoid((target_bound_y-0.5)*self.threshold)
-        target_elements_y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/4
+        target_elements_y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/(4**2)
         
         # Obtain number of structures of the input
         input_bound_x     = self.prewittx(input_sigmoid).abs()
         input_bound_x     = self.sigmoid((input_bound_x-0.5)*self.threshold)
-        input_elements_x  = self.prewitt(input_bound_x.sum(-2)).abs().sum(-1)/4
+        input_elements_x  = self.prewitt(input_bound_x.sum(-2)).abs().sum(-1)/(4**2)
         
         input_bound_y     = self.prewitty(input_sigmoid).abs()
         input_bound_y     = self.sigmoid((input_bound_y-0.5)*self.threshold)
-        input_elements_y  = self.prewitt(input_bound_y.sum(-1)).abs().sum(-1)/4
+        input_elements_y  = self.prewitt(input_bound_y.sum(-1)).abs().sum(-1)/(4**2)
 
         # Apply class weights
         if self.weight is not None:
