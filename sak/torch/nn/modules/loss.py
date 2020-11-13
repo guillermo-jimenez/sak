@@ -421,34 +421,34 @@ class InstanceLoss2d(torch.nn.Module):
         target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
         
         # Obtain number of structures of the target
-        target_bound_x   = self.prewittx(target_sigmoid).abs()
-        target_bound_x   = self.sigmoid((target_bound_x-0.5)*self.threshold)
-        target_structs_x = self.prewitt(target_bound_x.sum(-2)).abs().sum(-1)/4
+        target_bound_x    = self.prewittx(target_sigmoid).abs()
+        target_bound_x    = self.sigmoid((target_bound_x-0.5)*self.threshold)
+        target_elements_x = self.prewitt(target_bound_x.sum(-2)).abs().sum(-1)/4
         
-        target_bound_y   = self.prewitty(target_sigmoid).abs()
-        target_bound_y   = self.sigmoid((target_bound_y-0.5)*self.threshold)
-        target_structs_y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/4
+        target_bound_y    = self.prewitty(target_sigmoid).abs()
+        target_bound_y    = self.sigmoid((target_bound_y-0.5)*self.threshold)
+        target_elements_y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/4
         
         # Obtain number of structures of the input
-        input_bound_x    = self.prewittx(input_sigmoid).abs()
-        input_bound_x    = self.sigmoid((input_bound_x-0.5)*self.threshold)
-        input_structs_x  = self.prewitt(input_bound_x.sum(-2)).abs().sum(-1)/4
+        input_bound_x     = self.prewittx(input_sigmoid).abs()
+        input_bound_x     = self.sigmoid((input_bound_x-0.5)*self.threshold)
+        input_elements_x  = self.prewitt(input_bound_x.sum(-2)).abs().sum(-1)/4
         
-        input_bound_y    = self.prewitty(input_sigmoid).abs()
-        input_bound_y    = self.sigmoid((input_bound_y-0.5)*self.threshold)
-        input_structs_y  = self.prewitt(input_bound_y.sum(-1)).abs().sum(-1)/4
+        input_bound_y     = self.prewitty(input_sigmoid).abs()
+        input_bound_y     = self.sigmoid((input_bound_y-0.5)*self.threshold)
+        input_elements_y  = self.prewitt(input_bound_y.sum(-1)).abs().sum(-1)/4
 
         # Apply class weights
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
-            input_structs_x  =  input_structs_x*self.weight
-            input_structs_y  =  input_structs_y*self.weight
-            target_structs_x = target_structs_x*self.weight
-            target_structs_y = target_structs_y*self.weight
+            input_elements_x  =  input_elements_x*self.weight
+            input_elements_y  =  input_elements_y*self.weight
+            target_elements_x = target_elements_x*self.weight
+            target_elements_y = target_elements_y*self.weight
         
         # Retrieve final loss
-        loss = (self.loss(input_structs_x,target_structs_x)+self.loss(input_structs_y,target_structs_y))/2
+        loss = (self.loss(input_elements_x,target_elements_x)+self.loss(input_elements_y,target_elements_y))/2
 
         # Apply sample weight to samples
         if sample_weight is not None:
@@ -521,48 +521,37 @@ class F1InstanceLoss2d(torch.nn.Module):
         target_sigmoid = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
         
         # Obtain number of structures of the target
-        target_bound_x   = self.prewittx(target_sigmoid).abs()
-        target_bound_x   = self.sigmoid((target_bound_x-0.5)*self.threshold)
-        target_structs_x = self.prewitt(target_bound_x.sum(-2)).abs().sum(-1)/(4**2)
+        target_bound_x    = self.prewittx(target_sigmoid).abs()
+        target_bound_x    = self.sigmoid((target_bound_x-0.5)*self.threshold)
+        target_elements_x = self.prewitt(target_bound_x.sum(-2)).abs().sum(-1)/(4**2)
         
-        target_bound_y   = self.prewitty(target_sigmoid).abs()
+        target_bound_y    = self.prewitty(target_sigmoid).abs()
         target_bound_y   = self.sigmoid((target_bound_y-0.5)*self.threshold)
-        target_structs_y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/(4**2)
+        target_elements _y = self.prewitt(target_bound_y.sum(-1)).abs().sum(-1)/(4**2)
         
         # Obtain number of structures of the input
-        input_bound_x    = self.prewittx(input_sigmoid).abs()
-        input_bound_x    = self.sigmoid((input_bound_x-0.5)*self.threshold)
-        input_structs_x  = self.prewitt(input_bound_x.sum(-2)).abs().sum(-1)/(4**2)
+        input_bound_x     = self.prewittx(input_sigmoid).abs()
+        input_bound_x     = self.sigmoid((input_bound_x-0.5)*self.threshold)
+        input_elements_x  = self.prewitt(input_bound_x.sum(-2)).abs().sum(-1)/(4**2)
         
-        input_bound_y    = self.prewitty(input_sigmoid).abs()
-        input_bound_y    = self.sigmoid((input_bound_y-0.5)*self.threshold)
-        input_structs_y  = self.prewitt(input_bound_y.sum(-1)).abs().sum(-1)/(4**2)
+        input_bound_y     = self.prewitty(input_sigmoid).abs()
+        input_bound_y     = self.sigmoid((input_bound_y-0.5)*self.threshold)
+        input_elements_y  = self.prewitt(input_bound_y.sum(-1)).abs().sum(-1)/(4**2)
 
         # Apply class weights
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
-            input_structs_x  =  input_structs_x*self.weight
-            input_structs_y  =  input_structs_y*self.weight
-            target_structs_x = target_structs_x*self.weight
-            target_structs_y = target_structs_y*self.weight
+            input_elements_x  =  input_elements_x*self.weight
+            input_elements_y  =  input_elements_y*self.weight
+            target_elements_x = target_elements_x*self.weight
+            target_elements_y = target_elements_y*self.weight
         
-        # Hack to get whether target_structs or input_structs is larger
-        gate_x = self.sigmoid((target_structs_x-input_structs_x)*self.threshold)
-        gate_y = self.sigmoid((target_structs_y-input_structs_y)*self.threshold)
+        # Instance loss
+        loss_x = (target_elements_x-input_elements_x).abs()/(target_elements_x+input_elements_x)
+        loss_y = (target_elements_y-input_elements_y).abs()/(target_elements_y+input_elements_y)
+        loss   = (loss_x+loss_y)/2
 
-        # Basic metrics
-        truepositive_x  = (target_structs_x-gate_x*(target_structs_x-input_structs_x)).abs()
-        truepositive_y  = (target_structs_y-gate_y*(target_structs_y-input_structs_y)).abs()
-        falsepositive_x = (1-gate_x)*(input_structs_x-target_structs_x).abs()
-        falsepositive_y = (1-gate_y)*(input_structs_y-target_structs_y).abs()
-        falsenegative_x = gate_x*(target_structs_x-input_structs_x).abs()
-        falsenegative_y = gate_y*(target_structs_y-input_structs_y).abs()
-
-        # F1 loss
-        loss = 1-(2*truepositive_x + 2*truepositive_y + 1)/(2*truepositive_x + falsepositive_x + falsenegative_x + 
-                                                             2*truepositive_y + falsepositive_y + falsenegative_y + 1)
-        
         # Sum over channels
         loss = loss.sum(-1)
 
