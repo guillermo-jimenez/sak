@@ -493,23 +493,27 @@ class InstanceLoss2d(torch.nn.Module):
         # Obtain number of structures of the target
         target_bound_x    = self.prewittx(target).abs()
         # target_bound_x    = self.sigmoid((target_bound_x-0.5)*self.threshold)
-        target_elements_x = self.prewitt(target_bound_x.sum(-2)).abs()
+        target_bound_x_1d = self.prewitt(target_bound_x.sum(-2)).abs()
+        # target_bound_x_1d    = self.sigmoid((target_bound_x_1d-0.5)*self.threshold)
         target_elements_x = torch.flatten(target_bound_x_1d, start_dim=2).sum(-1)/(4**2)
 
         target_bound_y    = self.prewitty(target).abs()
         # target_bound_y    = self.sigmoid((target_bound_y-0.5)*self.threshold)
-        target_elements_y = self.prewitt(target_bound_y.sum(-1)).abs()
+        target_bound_y_1d = self.prewitt(target_bound_y.sum(-1)).abs()
+        # target_bound_y_1d    = self.sigmoid((target_bound_y_1d-0.5)*self.threshold)
         target_elements_y = torch.flatten(target_bound_y_1d, start_dim=2).sum(-1)/(4**2)
 
         # Obtain number of structures of the input
         input_bound_x     = self.prewittx(input).abs()
         # input_bound_x     = self.sigmoid((input_bound_x-0.5)*self.threshold)
-        input_elements_x  = self.prewitt(input_bound_x.sum(-2)).abs()
+        input_bound_x_1d  = self.prewitt(input_bound_x.sum(-2)).abs()
+        # input_bound_x_1d     = self.sigmoid((input_bound_x_1d-0.5)*self.threshold)
         input_elements_x  = torch.flatten(input_bound_x_1d, start_dim=2).sum(-1)/(4**2)
 
         input_bound_y     = self.prewitty(input).abs()
         # input_bound_y     = self.sigmoid((input_bound_y-0.5)*self.threshold)
-        input_elements_y  = self.prewitt(input_bound_y.sum(-1)).abs()
+        input_bound_y_1d  = self.prewitt(input_bound_y.sum(-1)).abs()
+        # input_bound_y_1d     = self.sigmoid((input_bound_y_1d-0.5)*self.threshold)
         input_elements_y  = torch.flatten(input_bound_y_1d, start_dim=2).sum(-1)/(4**2)
 
         # Apply class weights
