@@ -87,6 +87,7 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict,
                 iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.mean(batch_loss)))
             else:
                 iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], print_loss))
+            iterator.refresh()
 
     return batch_loss
 
