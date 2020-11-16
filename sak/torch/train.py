@@ -75,10 +75,10 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict,
 
         # Change iterator description
         if isinstance(iterator,tqdm.tqdm):
-            iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], print_loss))
-
-    if isinstance(iterator, tqdm.tqdm):
-        iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.mean(batch_loss)))
+            if i == len(iterator)-1:
+                iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], np.mean(batch_loss)))
+            else:
+                iterator.set_description("({}) Epoch {:>3d}/{:>3d}, Loss {:10.3f}".format(train_type, state['epoch']+1, execution['epochs'], print_loss))
 
     return batch_loss
 
