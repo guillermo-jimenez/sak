@@ -169,7 +169,7 @@ class DiceLoss(torch.nn.Module):
 
 
 
-class BoundDiceLoss(torch.nn.Module):
+class BoundDiceLoss1d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
         super().__init__()
         # Save inputs
@@ -208,7 +208,7 @@ class BoundDiceLoss(torch.nn.Module):
         return self.loss(boundary_input, boundary_target, sample_weight)
 
 
-class InstanceLoss(torch.nn.Module):
+class InstanceLoss1d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10, kernel_size: int = 3):
         super().__init__()
         self.channels = channels
@@ -284,7 +284,7 @@ class InstanceLoss(torch.nn.Module):
         return self.reduction(loss)
 
 
-class F1InstanceLoss(torch.nn.Module):
+class F1InstanceLoss1d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10, kernel_size: int = 3):
         super().__init__()
         self.channels = channels
@@ -337,8 +337,8 @@ class F1InstanceLoss(torch.nn.Module):
         target_boundary = self.sigmoid((target_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
 
         # Sum of elements alongside the spatial dimensions
-        input_elements = torch.flatten(input_boundary, start_dim=2).sum(-1)/4
-        target_elements = torch.flatten(target_boundary, start_dim=2).sum(-1)/4
+        input_elements = input_boundary.sum(-1)/4
+        target_elements = target_boundary.sum(-1)/4
 
         # Apply class weights
         if self.weight is not None:
@@ -348,8 +348,19 @@ class F1InstanceLoss(torch.nn.Module):
             input_elements = input_elements*self.weight
             target_elements = target_elements*self.weight
 
-        # Instance loss
-        loss = (target_elements-input_elements).abs()/(target_elements+input_elements)
+        # F1 loss
+        truepositive  = (target_elements-(target_elements-input_elements).clamp_min(0)).abs()
+        falsepositive = (input_elements-target_elements).clamp_min(0)
+        falsenegative = (target_elements-input_elements).clamp_min(0)
+
+        # F1 loss
+        loss = 1-(2*truepositive + 1)/(2*truepositive + falsepositive + falsenegative + 1)
+
+        # # Instance loss
+        # loss = (target_elements-input_elements).abs()/(target_elements+input_elements)
+
+        # Sum over channels
+        loss = loss.sum(-1)
 
         # Apply sample weight to samples
         if sample_weight is not None:
