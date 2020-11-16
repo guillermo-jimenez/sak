@@ -26,9 +26,13 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict,
     # Record progress
     batch_loss = np.zeros((len(dataloader),),dtype='float16')
 
-    # Apply data augmentation
-    if model.training and ('augmentation' in execution):
+    # Create transforms
+    if ('data_pre' in execution):
+        data_pre = sak.class_selector(execution["data_pre"]["class"])(**execution["data_pre"]["arguments"])
+    if ('augmentation' in execution) and model.training:
         augmentation = sak.class_selector(execution["augmentation"]["class"])(**execution["augmentation"]["arguments"])
+    if ('data_post' in execution):
+        data_post = sak.class_selector(execution["data_post"]["class"])(**execution["data_post"]["arguments"])
 
     # Select iterator decorator
     train_type = 'Train' if model.training else 'Valid'
@@ -40,10 +44,14 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict,
     # Iterate over all data in train/validation/test dataloader:
     print_loss = np.inf
     for i, inputs in enumerate(iterator):
-        # Apply data augmentation
-        if model.training and ('augmentation' in execution):
+        # Apply data transforms
+        if ('data_pre' in execution):
+            data_pre(inputs=inputs)
+        if ('augmentation' in execution) and model.training:
             augmentation(inputs=inputs)
-        
+        if ('data_post' in execution):
+            data_post(inputs=inputs)
+
         # Map all inputs to device
         for k in inputs:
             inputs[k] = inputs[k].to(state['device'], non_blocking=True)
