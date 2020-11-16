@@ -27,7 +27,8 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict,
     batch_loss = np.zeros((len(dataloader),),dtype='float16')
 
     # Apply data augmentation
-    augmentation = sak.class_selector(execution["augmentation"]["class"])(**execution["augmentation"]["arguments"])
+    if model.training and ('augmentation' in execution):
+        augmentation = sak.class_selector(execution["augmentation"]["class"])(**execution["augmentation"]["arguments"])
 
     # Select iterator decorator
     train_type = 'Train' if model.training else 'Valid'
