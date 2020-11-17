@@ -77,6 +77,13 @@ class PearsonCorrelationLoss: # Stupid wrapper to homogeinize code with the impo
 
         return torch.sum(vX_pred * vX) / (torch.sqrt(torch.sum(vX_pred ** 2)) * torch.sqrt(torch.sum(vX ** 2)))
 
+class ConstantLoss:
+    def __init__(self, value: Union[float, torch.Tensor]):
+        self.value = torch.tensor(value)
+
+    def __call__(self, *args, **kwargs) -> torch.Tensor:
+        return self.value
+
 class KLD_MSE:
     def __init__(self, reduction: str = 'mean', beta: float = 0.01, **kwargs):
         self.reduction = reduction
