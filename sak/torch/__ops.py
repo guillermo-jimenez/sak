@@ -1,4 +1,4 @@
-from typing import Union, Dict, List, Callable
+from typing import Union, Dict, List, Callable, Iterable, Tuple
 from sak import class_selector, from_dict
 from warnings import warn
 
@@ -13,21 +13,38 @@ class Mapper:
         self.input_mappings = input_mappings
         self.output_mappings = output_mappings
         
-    def __call__(self, **kwargs):
+    def __call__(self, *args, **kwargs):
         # Check input and output types
         assert all([isinstance(kwargs[k], Dict) for k in kwargs]), "Inputs and outputs must be specified as dicts"
         
         input_args = []
-        for dict_from,element in self.input_mappings:
-            input_args.append(kwargs[dict_from][element])
+        for inputs in self.input_mappings:
+            if isinstance(inputs, int):
+                input_args.append(args[inputs])
+            elif isinstance(inputs, List) or isinstance(inputs, Tuple):
+                dict_from,element = inputs
+                input_args.append(kwargs[dict_from][element])
         
         output = self.operation(*input_args)
+        print(self.operation)
+        mark_return = False
 
         if len(self.output_mappings) == 0:
             return output
         else:
-            if not isinstance(output, List):
-                assert len(self.output_mappings) == 1, "Mismatch between length of resulting operation. Broadcasting..."
+            if (not isinstance(output, List)) and (not isinstance(output, Tuple)):
+                assert len(self.output_mappings) == len(output), "Mismatch between length of resulting operation. Broadcasting..."
                 output = [output]
-            for i,(dict_from,element) in enumerate(self.output_mappings):
-                kwargs[dict_from][element] = output[i]
+                
+            for i,outputs in enumerate(self.output_mappings):
+                if isinstance(inputs, int):
+                    if isinstance(args, Iterable):
+                        args = list(args)
+                        mark_return = True
+                    args[outputs] = output[i]
+                elif isinstance(inputs, Iterable):
+                    dict_from,element = outputs
+                    kwargs[dict_from][element] = output[i]
+        
+        if mark_return:
+            return tuple(args)
