@@ -64,7 +64,7 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict,
         outputs = model(inputs)
 
         # Calculate loss
-        loss = criterion(inputs=inputs,outputs=outputs)
+        loss = criterion(inputs=inputs,outputs=outputs,state=state)
 
         # Break early
         if torch.isnan(loss):
