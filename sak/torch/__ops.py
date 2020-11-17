@@ -1,13 +1,17 @@
-from typing import Dict, List
-from sak import class_selector
+from typing import Union, Dict, List, Callable
+from sak import class_selector, from_dict
 from warnings import warn
 
 class Mapper:
-    def __init__(self, json: Dict):
-        cls = class_selector(json["class"])
-        self.function = cls(**json.get("arguments",{}))
-        self.input_mappings = json["input_mappings"]
-        self.output_mappings = json.get("output_mappings",[])
+    def __init__(self, operation: Union[Dict, Callable], input_mappings: List, output_mappings: Dict = []):
+        if isinstance(operation, Callable):
+            self.operation = operation
+        elif isinstance(operation, Dict):
+            self.operation = from_dict(operation)
+        else:
+            raise ValueError("Required input 'operation' provided with invalid type {}".format(type(operation)))
+        self.input_mappings = input_mappings
+        self.output_mappings = output_mappings
         
     def __call__(self, **kwargs):
         # Check input and output types
@@ -17,7 +21,7 @@ class Mapper:
         for dict_from,element in self.input_mappings:
             input_args.append(kwargs[dict_from][element])
         
-        output = self.function(*input_args)
+        output = self.operation(*input_args)
 
         if len(self.output_mappings) == 0:
             return output
