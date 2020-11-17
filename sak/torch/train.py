@@ -3,6 +3,8 @@ from typing import Tuple
 from typing import List
 from typing import Callable
 import os
+import csv
+import time
 import dill
 import os.path
 import shutil
@@ -116,6 +118,11 @@ def train_model(model, state: dict, execution: dict, loader: torch.utils.data.Da
             torch.save(model, os.path.join(execution['save_directory'],'checkpoint.model'), pickle_module=dill)
             sak.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
             
+            # Log train loss
+            with open(os.path.join(execution['save_directory'],'log.csv'),'a') as f:
+                csvwriter = csv.writer(f)
+                csvwriter.writerow("(Train) Epoch {:>3d}/{:>3d}, Loss {:10.3f}, Time {}".format(state['epoch']+1, execution['epochs'], state['loss_train'], time.ctime()))
+
             # Check if loss is best loss
             if state['loss_train'] < state['best_loss']:
                 state['best_loss'] = state['loss_train']
@@ -169,6 +176,12 @@ def train_valid_model(model, state: dict, execution: dict,
             torch.save(model, os.path.join(execution['save_directory'],'checkpoint.model'), pickle_module=dill)
             sak.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
             
+            # Log train/valid losses
+            with open(os.path.join(execution['save_directory'],'log.csv'),'a') as f:
+                csvwriter = csv.writer(f)
+                csvwriter.writerow("(Train) Epoch {:>3d}/{:>3d}, Loss {:10.3f}, Time {}".format(state['epoch']+1, execution['epochs'], state['loss_train'], time.ctime()))
+                csvwriter.writerow("(Valid) Epoch {:>3d}/{:>3d}, Loss {:10.3f}, Time {}".format(state['epoch']+1, execution['epochs'], state['loss_validation'], time.ctime()))
+
             # Check if loss is best loss
             compound_loss = 2*state['loss_train']*state['loss_validation']/(state['loss_train']+state['loss_validation'])
             if compound_loss < state['best_loss']:
