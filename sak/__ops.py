@@ -75,7 +75,9 @@ def from_dict(operation: dict):
     # Check input
     assert isinstance(operation, dict), "Only nested dictionaries can be used as input"
     assert "class" in operation,        "Missing 'class' field in dictionary"
-    assert "arguments" in operation,    "Missing 'arguments' field in dictionary"
+
+    # Default argument is empty
+    operation["arguments"] = operation.get("arguments",{})
     
     # If the argument field has nested calls
     if isinstance(operation["arguments"], dict):
