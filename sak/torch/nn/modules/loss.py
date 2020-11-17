@@ -1,4 +1,4 @@
-from typing import Tuple, Iterable
+from typing import Union, Tuple, Iterable, Callable, Dict, List
 import numpy as np
 import torch 
 import torch.nn
@@ -18,27 +18,35 @@ class none:
     def __call__(self, *args,**kwargs): # Stupid wrapper to homogeinize code with the imported classes
         return 0
 
-class CompoundLoss:
-    def __init__(self, operations: dict, weights: list = None):
+class CompoundLoss(torch.nn.Module):
+    def __init__(self, operations: Iterable[Union[Callable, Dict]], weight: Iterable = None):
+        super().__init__()
         self.operations = []
-        self.weights = weights
-        
         for op in operations:
-            # Retrieve operation class
-            cls = sak.class_selector(op['class'])
-            self.operations.append(cls(**op.get('arguments',{})))
-            
-        if self.weights is None:
-            self.weights = [1]*len(self.operations)
-            
-        assert len(self.operations) == len(self.weights), "The number of provided operations mismatches the size of the provided weights"
-            
-    def __call__(self, **kwargs) -> torch.Tensor:
-        loss = 0
+            if isinstance(op, Callable):
+                self.operations.append(op)
+            elif isinstance(op, dict):
+                assert "class" in op,     "Missing 'class' field in dictionary"
+                assert "arguments" in op, "Missing 'arguments' field in dictionary"
+                # Retrieve operation class
+                cls = sak.class_selector(op['class'])
+                self.operations.append(cls(**op.get('arguments',{})))
+            else:
+                raise ValueError("Invalid inputs provided of type {}".format(type(op)))
         
+        # Store weights
+        self.weight = weight
+        if self.weight is None:
+            self.weight = [1]*len(self.operations)
+            
+        assert len(self.operations) == len(self.weight), "The number of provided operations mismatches the size of the provided weights"
+            
+    def forward(self, **kwargs) -> torch.Tensor:
+        loss = 0
+
         for i in range(len(self.operations)):
             # add loss to total loss
-            loss += self.weights[i]*self.operations[i](**kwargs)
+            loss += self.weight[i]*self.operations[i](**kwargs)
             
         return loss
 
@@ -172,6 +180,8 @@ class DiceLoss(torch.nn.Module):
 class BoundDiceLoss1d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
         super().__init__()
+        self.register_buffer('weight', weight)
+
         # Save inputs
         self.channels = channels
         self.reduction = reduction
@@ -211,6 +221,8 @@ class BoundDiceLoss1d(torch.nn.Module):
 class InstanceLoss1d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10, kernel_size: int = 3):
         super().__init__()
+        self.register_buffer('weight', weight)
+
         self.channels = channels
         if weight is None:
             self.weight = None
@@ -287,6 +299,8 @@ class InstanceLoss1d(torch.nn.Module):
 class F1InstanceLoss1d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10, kernel_size: int = 3):
         super().__init__()
+        self.register_buffer('weight', weight)
+
         self.channels = channels
         if weight is None:
             self.weight = None
@@ -373,6 +387,8 @@ class F1InstanceLoss1d(torch.nn.Module):
 class BoundDiceLoss2d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
         super().__init__()
+        self.register_buffer('weight', weight)
+
         # Save inputs
         self.channels = channels
         self.reduction = reduction
@@ -445,6 +461,8 @@ class BoundDiceLoss2d(torch.nn.Module):
 class InstanceLoss2d(torch.nn.Module):
     def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10, kernel_size: int = 3):
         super().__init__()
+        self.register_buffer('weight', weight)
+
         # Save inputs
         self.channels = channels
         self.threshold = threshold
@@ -551,6 +569,8 @@ class InstanceLoss2d(torch.nn.Module):
 class F1InstanceLoss2d(torch.nn.Module):
     def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10, kernel_size: int = 3):
         super().__init__()
+        self.register_buffer('weight', weight)
+
         # Save inputs
         self.channels = channels
         self.threshold = threshold
