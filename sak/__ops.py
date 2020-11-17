@@ -4,7 +4,12 @@ import numpy as np
 import pickle
 import importlib
 
-def as_tuple(*args) -> Tuple:
+def as_tuple(*args: Tuple[Any]) -> Tuple:
+    """Returns variable number of inputs as a tuple. Useful to load from json. Usage:
+   
+    >>> as_tuple(5, [2.3, "this"], min)
+    (5, [2.3, 'this'], <built-in function min>)
+    """
     return args
 
 # Data loader to un-clutter code    
@@ -27,7 +32,7 @@ def load_data(file, dtype=int,start_dim=1):
         dic[head] = tail
     return dic
 
-# Data loader to un-clutter code    
+# Data saver to un-clutter code    
 def save_data(dic,filepath):
     with open(filepath, 'w') as f:
         for key in dic.keys():
