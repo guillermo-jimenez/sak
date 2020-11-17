@@ -16,7 +16,7 @@ from sak.__ops import check_required
 class ModelGraph(Module):
     r"""A model composer"""
 
-    def __init__(self, json):
+    def __init__(self, functions: List[Dict], nodes: List[Dict], edges: List[List]):
         super(ModelGraph, self).__init__()
         
         # Network's computational graph
@@ -25,13 +25,13 @@ class ModelGraph(Module):
         # Retrieve output list for forward function
         self.__input_list = []
         self.__return_list = []
-        for function in json['functions']:
+        for function in functions:
             if function['name'] == 'forward':
                 self.__input_list += function['inputs']
                 self.__return_list += function['outputs']
 
         # Add nodes to graph
-        for node in json['nodes']:
+        for node in nodes:
             is_node_input = node['id'] in self.__input_list
             does_node_return = node['id'] in self.__return_list
             self.graph.add_node(node['id'], returns=does_node_return, inputs=is_node_input)
@@ -41,18 +41,18 @@ class ModelGraph(Module):
             self.add_module(node['id'], cls(**node.get('arguments',{})))
         
         # Add edges to graph
-        for edge_from, edge_to in json['edges']:
+        for (node_from,node_to) in edges:
             # Convert to tuples (list not acceptable as identifiers)
-            if isinstance(edge_from, list):
-                edge_from = tuple(edge_from)
-            if isinstance(edge_to, list):
-                edge_to = tuple(edge_to)
+            if isinstance(node_from, list):
+                node_from = tuple(node_from)
+            if isinstance(node_to, list):
+                node_to = tuple(node_to)
 
             # Add edges between nodes
-            self.graph.add_edge(edge_from, edge_to)
+            self.graph.add_edge(node_from, node_to)
 
         # Check structural integrity of the produced network
-        terminal_outputs = set(itertools.chain(*[function['outputs'] for function in json['functions']]))
+        terminal_outputs = set(itertools.chain(*[function['outputs'] for function in functions]))
         terminal_nodes = set([x for x in self.graph.nodes() if self.graph.out_degree(x)==0 and self.graph.in_degree(x)>=1])
         if len(terminal_nodes) != len(terminal_outputs):
             warnings.warn("Nodes {} are leafs but not marked as outputs. Check the provided config file".format(terminal_nodes-terminal_outputs))
@@ -60,7 +60,7 @@ class ModelGraph(Module):
         # Set output computational flows
         self.output_paths = {}
         self.subgraphs = {}
-        for function in json['functions']:
+        for function in functions:
             # Retrieve paths
             all_executions = []
             subgraphs = []
