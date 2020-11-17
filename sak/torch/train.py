@@ -28,11 +28,11 @@ def do_epoch(model: torch.nn.Module, state: dict, execution: dict,
 
     # Create transforms
     if ('data_pre' in execution):
-        data_pre = sak.class_selector(execution["data_pre"]["class"])(**execution["data_pre"]["arguments"])
+        data_pre = sak.from_dict(execution["data_pre"])
     if ('augmentation' in execution) and model.training:
-        augmentation = sak.class_selector(execution["augmentation"]["class"])(**execution["augmentation"]["arguments"])
+        augmentation = sak.from_dict(execution["augmentation"])
     if ('data_post' in execution):
-        data_post = sak.class_selector(execution["data_post"]["class"])(**execution["data_post"]["arguments"])
+        data_post = sak.from_dict(execution["data_post"])
 
     # Select iterator decorator
     train_type = 'Train' if model.training else 'Valid'
@@ -97,7 +97,7 @@ def train_model(model, state: dict, execution: dict, loader: torch.utils.data.Da
     model = model.to(state['device'])
 
     # Instantiate criterion
-    criterion = sak.class_selector(execution['loss']['class'])(**execution['loss'].get('arguments',{}))
+    criterion = sak.from_dict(execution['loss'])
     
     # Initialize best loss for early stopping
     if 'best_loss' not in state:
@@ -141,7 +141,7 @@ def train_valid_model(model, state: dict, execution: dict,
     model = model.to(state['device'])
 
     # Instantiate criterion
-    criterion = sak.class_selector(execution['loss']['class'])(**execution['loss'].get('arguments',{}))
+    criterion = sak.from_dict(execution['loss'])
     
     # Initialize best loss for early stopping
     if 'best_loss' not in state:
