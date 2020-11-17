@@ -26,14 +26,13 @@ class Mapper:
                 input_args.append(kwargs[dict_from][element])
         
         output = self.operation(*input_args)
-        print(self.operation)
         mark_return = False
 
         if len(self.output_mappings) == 0:
             return output
         else:
             if (not isinstance(output, List)) and (not isinstance(output, Tuple)):
-                assert len(self.output_mappings) == len(output), "Mismatch between length of resulting operation. Broadcasting..."
+                assert len(self.output_mappings) == 1, "Mismatch between length of resulting operation. Broadcasting..."
                 output = [output]
                 
             for i,outputs in enumerate(self.output_mappings):
