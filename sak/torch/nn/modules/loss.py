@@ -19,7 +19,7 @@ class none:
         return 0
 
 class CompoundLoss(torch.nn.Module):
-    def __init__(self, operations: Iterable[Union[Callable, Dict]], weight: Iterable = None):
+    def __init__(self, operations: Iterable[Union[Callable, Dict]], weight: Iterable[Union[int, float, Dict]] = None):
         super().__init__()
         self.operations = []
         for op in operations:
@@ -29,24 +29,39 @@ class CompoundLoss(torch.nn.Module):
                 assert "class" in op,     "Missing 'class' field in dictionary"
                 assert "arguments" in op, "Missing 'arguments' field in dictionary"
                 # Retrieve operation class
-                cls = sak.class_selector(op['class'])
-                self.operations.append(cls(**op.get('arguments',{})))
+                self.operations.append(sak.from_dict(op))
             else:
                 raise ValueError("Invalid inputs provided of type {}".format(type(op)))
         
         # Store weights
-        self.weight = weight
-        if self.weight is None:
+        self.weight = []
+        if weight is None:
             self.weight = [1]*len(self.operations)
-            
+        else:
+            for w in weight:
+                if isinstance(w, int) or isinstance(w, float):
+                    self.weight.append(w)
+                elif isinstance(w, dict):
+                    self.weight.append(sak.from_dict(w))
+                else:
+                    raise ValueError("Invalid inputs provided of type {}".format(type(w)))
+
+        # Assert number of weights is the same as number of operations
         assert len(self.operations) == len(self.weight), "The number of provided operations mismatches the size of the provided weights"
             
-    def forward(self, **kwargs) -> torch.Tensor:
+    def forward(self, state={}, **kwargs) -> torch.Tensor:
         loss = 0
 
         for i in range(len(self.operations)):
             # add loss to total loss
-            loss += self.weight[i]*self.operations[i](**kwargs)
+            w = self.weight[i]
+            # If loss vary given the epoch
+            if isinstance(self.weight[i], Iterable):
+                if "epoch" in state:
+                    w = w[min([state["epoch"],len(w)-1])]
+                else:
+                    w = w[-1]
+            loss += w*self.operations[i](**kwargs)
             
         return loss
 
