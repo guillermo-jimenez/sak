@@ -240,6 +240,80 @@ class BoundDiceLoss1d(torch.nn.Module):
         return self.loss(boundary_input, boundary_target, sample_weight)
 
 
+class BoundDiceLoss2d(torch.nn.Module):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
+        super().__init__()
+        self.register_buffer('weight', weight)
+
+        # Save inputs
+        self.channels = channels
+        self.reduction = reduction
+        self.eps = eps
+        self.weight = weight
+        self.kernel_size = kernel_size
+        
+        # Define auxiliary loss
+        self.loss = DiceLoss(reduction,eps,weight)
+        
+        # Define convolutional operation
+        self.prewittx  = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewitty  = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewittxy = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewittyx = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+
+        # Mark as non-trainable
+        for param in self.prewittx.parameters(): param.requires_grad = False
+        for param in self.prewitty.parameters(): param.requires_grad = False
+        for param in self.prewittxy.parameters(): param.requires_grad = False
+        for param in self.prewittyx.parameters(): param.requires_grad = False
+
+        # Override weights to make Prewitt filters
+        self.prewittx.weight[...]  = 0.
+        self.prewitty.weight[...]  = 0.
+        self.prewittxy.weight[...] = 0.
+        self.prewittyx.weight[...] = 0.
+        for c in range(self.channels):
+            # x
+            self.prewittx.weight[c,c, 0, 0]  = -1.
+            self.prewittx.weight[c,c,-1, 0]  =  1.
+            # y
+            self.prewitty.weight[c,c, 0, 0]  = -1.
+            self.prewitty.weight[c,c, 0,-1]  =  1.
+            # xy
+            self.prewittxy.weight[c,c, 0, 0] = -1.
+            self.prewittxy.weight[c,c,-1,-1] =  1.
+            # yx
+            self.prewittyx.weight[c,c,-1, 0] =  1.
+            self.prewittyx.weight[c,c, 0,-1] = -1.
+    
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
+        # Move operation to device
+        self.prewittx   = self.prewittx.to(target.device)
+        self.prewitty   = self.prewitty.to(target.device)
+        self.prewittxy  = self.prewittxy.to(target.device)
+        self.prewittyx  = self.prewittyx.to(target.device)
+
+        # Obtain number of structures of the input
+        input_bound_x   = self.prewittx(input).abs()
+        input_bound_y   = self.prewitty(input).abs()
+        input_bound_xy  = self.prewittxy(input).abs()
+        input_bound_yx  = self.prewittyx(input).abs()
+
+        # Obtain number of structures of the target
+        target_bound_x  = self.prewittx(target).abs()
+        target_bound_y  = self.prewitty(target).abs()
+        target_bound_xy = self.prewittxy(target).abs()
+        target_bound_yx = self.prewittyx(target).abs()
+        
+        # Boundary loss
+        loss_x  = self.loss(input_bound_x,target_bound_x,sample_weight)
+        loss_y  = self.loss(input_bound_y,target_bound_y,sample_weight)
+        loss_xy = self.loss(input_bound_xy,target_bound_xy,sample_weight)
+        loss_yx = self.loss(input_bound_yx,target_bound_yx,sample_weight)
+
+        return (loss_x+loss_y+loss_xy+loss_yx)/4
+
+
 class F1InstanceLoss1d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3):
         super().__init__()
@@ -313,80 +387,6 @@ class F1InstanceLoss1d(torch.nn.Module):
 
         # Obtain loss
         return self.reduction(loss)
-
-
-class BoundDiceLoss2d(torch.nn.Module):
-    def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
-        super().__init__()
-        self.register_buffer('weight', weight)
-
-        # Save inputs
-        self.channels = channels
-        self.reduction = reduction
-        self.eps = eps
-        self.weight = weight
-        self.kernel_size = kernel_size
-        
-        # Define auxiliary loss
-        self.loss = DiceLoss(reduction,eps,weight)
-        
-        # Define convolutional operation
-        self.prewittx  = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
-        self.prewitty  = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
-        self.prewittxy = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
-        self.prewittyx = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
-
-        # Mark as non-trainable
-        for param in self.prewittx.parameters(): param.requires_grad = False
-        for param in self.prewitty.parameters(): param.requires_grad = False
-        for param in self.prewittxy.parameters(): param.requires_grad = False
-        for param in self.prewittyx.parameters(): param.requires_grad = False
-
-        # Override weights to make Prewitt filters
-        self.prewittx.weight[...]  = 0.
-        self.prewitty.weight[...]  = 0.
-        self.prewittxy.weight[...] = 0.
-        self.prewittyx.weight[...] = 0.
-        for c in range(self.channels):
-            # x
-            self.prewittx.weight[c,c, 0, 0]  = -1.
-            self.prewittx.weight[c,c,-1, 0]  =  1.
-            # y
-            self.prewitty.weight[c,c, 0, 0]  = -1.
-            self.prewitty.weight[c,c, 0,-1]  =  1.
-            # xy
-            self.prewittxy.weight[c,c, 0, 0] = -1.
-            self.prewittxy.weight[c,c,-1,-1] =  1.
-            # yx
-            self.prewittyx.weight[c,c,-1, 0] =  1.
-            self.prewittyx.weight[c,c, 0,-1] = -1.
-    
-    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
-        # Move operation to device
-        self.prewittx   = self.prewittx.to(target.device)
-        self.prewitty   = self.prewitty.to(target.device)
-        self.prewittxy  = self.prewittxy.to(target.device)
-        self.prewittyx  = self.prewittyx.to(target.device)
-
-        # Obtain number of structures of the input
-        input_bound_x   = self.prewittx(input).abs()
-        input_bound_y   = self.prewitty(input).abs()
-        input_bound_xy  = self.prewittxy(input).abs()
-        input_bound_yx  = self.prewittyx(input).abs()
-
-        # Obtain number of structures of the target
-        target_bound_x  = self.prewittx(target).abs()
-        target_bound_y  = self.prewitty(target).abs()
-        target_bound_xy = self.prewittxy(target).abs()
-        target_bound_yx = self.prewittyx(target).abs()
-        
-        # Boundary loss
-        loss_x  = self.loss(input_bound_x,target_bound_x,sample_weight)
-        loss_y  = self.loss(input_bound_y,target_bound_y,sample_weight)
-        loss_xy = self.loss(input_bound_xy,target_bound_xy,sample_weight)
-        loss_yx = self.loss(input_bound_yx,target_bound_yx,sample_weight)
-
-        return (loss_x+loss_y+loss_xy+loss_yx)/4
 
 
 class F1InstanceLoss2d(torch.nn.Module):
