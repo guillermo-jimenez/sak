@@ -49,33 +49,32 @@ class AdjustGamma(object):
 
 
 class AffineTransform(object):
-    def __init__(self, matrix: np.ndarray = None, scale: float = None, rotation: float = None, shear: float = None, translation: float = None):
-        self.matrix = matrix
-        self.scale = scale
-        self.rotation = rotation
-        self.shear = shear
-        self.translation = translation
+    def __init__(self, max_iterations: int = 3, threshold_scale: float = 0.1, threshold_rotation: float = 0.1, threshold_shear: float = 0.1, threshold_translation: float = 0.1):
+        self.max_iterations = max_iterations
+        self.threshold_scale = threshold_scale
+        self.threshold_rotation = threshold_rotation
+        self.threshold_shear = threshold_shear
+        self.threshold_translation = threshold_translation
 
     def __call__(self, x: torch.Tensor, y: torch.Tensor):
         # Output tensor
-        out_x = torch.empty_like(x)
-        out_y = torch.empty_like(y)
-
-        # Define warp matrix
-        matrix,scale,rotation,shear,translation = (None,None,None,None,None)
-        if      self.matrix is not None: matrix      =      self.matrix*(np.random.rand()*0.5 + 0.75)*np.random.choice([-1,1])
-        if       self.scale is not None: scale       =       self.scale*(np.random.rand()*0.5 + 0.75)*np.random.choice([-1,1])
-        if    self.rotation is not None: rotation    =    self.rotation*(np.random.rand()*0.5 + 0.75)*np.random.choice([-1,1])
-        if       self.shear is not None: shear       =       self.shear*(np.random.rand()*0.5 + 0.75)*np.random.choice([-1,1])
-        if self.translation is not None: translation = self.translation*(np.random.rand()*0.5 + 0.75)*np.random.choice([-1,1])
-        warp_matrix = skimage.transform.AffineTransform(matrix,scale,rotation,shear,translation)
+        out_x = x.clone()
+        out_y = y.clone()
 
         # Apply transformation to each element in the batch
-        for b in range(x.shape[0]):
-            for c in range(x.shape[1]):
-                out_x[b,c] = torch.tensor(skimage.transform.warp(x[b,c].numpy(), warp_matrix))
-            for c in range(y.shape[1]):
-                out_y[b,c] = torch.tensor(skimage.transform.warp(y[b,c].numpy(), warp_matrix))
+        scale       = (np.random.rand(self.max_iterations,x.shape[0])*self.threshold_scale+(1-self.threshold_scale/2))
+        rotation    = (np.random.rand(self.max_iterations,x.shape[0])*self.threshold_rotation-self.threshold_rotation/2)
+        shear       = (np.random.rand(self.max_iterations,x.shape[0])*self.threshold_shear-self.threshold_shear/2)
+        translation = (np.random.rand(self.max_iterations,x.shape[0])*self.threshold_translation-self.threshold_translation/2)
+        for it in range(np.random.randint(self.max_iterations)):
+            for b in range(x.shape[0]):
+                # Define warp matrix
+                warp_matrix = skimage.transform.AffineTransform(None,scale[it,b],rotation[it,b],shear[it,b],translation[it,b])
+
+                for c in range(x.shape[1]):
+                    out_x[b,c] = torch.tensor(skimage.transform.warp(out_x[b,c].numpy(), warp_matrix))
+                for c in range(y.shape[1]):
+                    out_y[b,c] = torch.tensor(skimage.transform.warp(out_y[b,c].numpy(), warp_matrix))
 
         return out_x, out_y
 
