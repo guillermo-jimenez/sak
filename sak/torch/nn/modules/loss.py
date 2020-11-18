@@ -200,7 +200,7 @@ class DiceLoss(torch.nn.Module):
 
 
 class BoundDiceLoss1d(torch.nn.Module):
-    def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 1):
         super().__init__()
         self.register_buffer('weight', weight)
 
@@ -241,7 +241,7 @@ class BoundDiceLoss1d(torch.nn.Module):
 
 
 class BoundDiceLoss2d(torch.nn.Module):
-    def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 25):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 1):
         super().__init__()
         self.register_buffer('weight', weight)
 
