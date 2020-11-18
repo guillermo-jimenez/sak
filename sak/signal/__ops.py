@@ -10,6 +10,9 @@ def moving_lambda(x: Iterable, stride: int, lmbda: Callable) -> List[Iterable]:
 def sigmoid(x: float or Iterable) -> float or np.ndarray:
     return 1/(1 + np.exp(-x))
 
+def normal(num: int, sigma: float = 1) -> np.ndarray:
+    return np.exp(-(np.linspace(-3*sigma,3*sigma,num)**2)/(2*sigma**2))/(np.sqrt(2*np.pi)*sigma)
+
 def power(x: np.ndarray, axis=None) -> float:
     """Compute signal power"""
     return np.mean((x - np.median(x,axis=axis))**2,axis=axis)

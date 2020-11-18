@@ -6,6 +6,7 @@ from .__ops import abs_max_is_positive
 from .__ops import signed_maxima
 from .__ops import signed_minima
 from .__ops import sigmoid
+from .__ops import normal
 from .__ops import power
 from .__ops import zero_crossings
 from .__ops import positive_zero_crossings
