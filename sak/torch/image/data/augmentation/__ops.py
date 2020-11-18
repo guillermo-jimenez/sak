@@ -79,6 +79,74 @@ class AffineTransform(object):
         return out_x, out_y
 
 
+class UpDownSample(object):
+    def __init__(self, max_factor: int = 5):
+        self.max_factor = max_factor
+
+    def __call__(self, x: torch.Tensor):
+        factor = np.random.randint(2,self.max_factor+1)
+        x = torch.nn.AvgPool2d(kernel_size = factor, stride = factor, padding = factor//2)(x.clone())
+        x = torch.nn.Upsample(scale_factor = factor)(x)
+        return x
+
+
+class EqualizeHistogram(object):
+    def __init__(self, nbins: int = 5, mask = None):
+        self.nbins = nbins
+        self.mask = mask
+
+    def __call__(self, x: torch.Tensor):
+        # Output structure
+        out_x = torch.empty_like(x)
+
+        # Retrieve max scale
+        max_scale = x.max()
+        if   x.max() <= 1:
+            max_scale = 1
+        elif x.max() <= 255:
+            max_scale = 255
+
+        # Perform operation
+        for b in range(x.shape[0]):
+            for c in range(x.shape[1]):
+                out = skimage.exposure.equalize_hist(x[b,c].numpy())
+                out = skimage.exposure.rescale_intensity(out,out_range='float32')
+                out_x[b,c] = torch.tensor(out*max_scale)
+
+        return out_x
+
+
+class SaltAndPepperNoise(object):
+    def __init__(self, threshold: float = 0.05):
+        self.threshold = threshold
+
+    def __call__(self, x: torch.Tensor):
+        # Output structure
+        out_x = torch.empty_like(x)
+        maximum = x.max()
+        max_val = maximum*(1-self.threshold)
+        min_val = maximum*(1-self.threshold)
+        
+        # Generate mask
+        noise = torch.rand_like(x)
+    
+        # Retrieve max scale
+        max_scale = x.max()
+        if   x.max() <= 1:
+            max_scale = 1
+        elif x.max() <= 255:
+            max_scale = 255
+
+        # Perform operation
+        for b in range(x.shape[0]):
+            for c in range(x.shape[1]):
+                out = skimage.exposure.equalize_hist(x[b,c].numpy())
+                out = skimage.exposure.rescale_intensity(out,out_range='float32')
+                out_x[b,c] = torch.tensor(out*max_scale)
+
+        return out_x
+
+
 class RescaleIntensity(object):
     def __init__(self, out_range: str = 'float32'):
         self.out_range = out_range
