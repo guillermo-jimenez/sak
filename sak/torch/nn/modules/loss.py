@@ -299,30 +299,31 @@ class BoundDiceLoss2d(torch.nn.Module):
             self.prewittyx  = self.prewittyx.to(target.device)
 
         # Obtain number of structures of the input
-        input_bound_x   = self.prewittx(input).abs()
-        input_bound_y   = self.prewitty(input).abs()
-        if self.diagonal:
-            input_bound_xy  = self.prewittxy(input).abs()
-            input_bound_yx  = self.prewittyx(input).abs()
+        input_bound  = torch.zeros_like(input)
+        target_bound = torch.zeros_like(target)
 
-        # Obtain number of structures of the target
-        target_bound_x  = self.prewittx(target).abs()
-        target_bound_y  = self.prewitty(target).abs()
+        # Horizontal
+        input_bound  += self.prewittx(input).abs()
+        target_bound += self.prewittx(target).abs()
+
+        # Vertical
+        input_bound  += self.prewitty(input).abs()
+        target_bound += self.prewitty(target).abs()
         if self.diagonal:
-            target_bound_xy = self.prewittxy(target).abs()
-            target_bound_yx = self.prewittyx(target).abs()
-        
+            # Diagonal 1
+            input_bound  += self.prewittxy(input).abs()
+            target_bound += self.prewittxy(target).abs()
+
+            # Diagonal 2
+            input_bound  += self.prewittyx(input).abs()
+            target_bound += self.prewittyx(target).abs()
+
+        # Clamp
+        input_bound  = input_bound.clamp_max(1)
+        target_bound = target_bound.clamp_max(1)
+
         # Boundary loss
-        loss_x  = self.loss(input_bound_x,target_bound_x,sample_weight)
-        loss_y  = self.loss(input_bound_y,target_bound_y,sample_weight)
-        if self.diagonal:
-            loss_xy = self.loss(input_bound_xy,target_bound_xy,sample_weight)
-            loss_yx = self.loss(input_bound_yx,target_bound_yx,sample_weight)
-
-        if self.diagonal:
-            return (loss_x+loss_y+loss_xy+loss_yx)/4
-        else:
-            return (loss_x+loss_y)/2
+        return self.loss(input_bound,target_bound,sample_weight)
 
 
 class F1InstanceLoss1d(torch.nn.Module):
