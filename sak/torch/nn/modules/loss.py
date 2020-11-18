@@ -251,6 +251,7 @@ class BoundDiceLoss2d(torch.nn.Module):
         self.eps = eps
         self.weight = weight
         self.kernel_size = kernel_size
+        self.diagonal = diagonal
         
         # Define auxiliary loss
         self.loss = DiceLoss(reduction,eps,weight)
@@ -275,6 +276,7 @@ class BoundDiceLoss2d(torch.nn.Module):
         if self.diagonal:
             self.prewittxy.weight[...] = 0.
             self.prewittyx.weight[...] = 0.
+            
         for c in range(self.channels):
             # x
             self.prewittx.weight[c,c, 0, 0]  = -1.
