@@ -240,86 +240,8 @@ class BoundDiceLoss1d(torch.nn.Module):
         return self.loss(boundary_input, boundary_target, sample_weight)
 
 
-class InstanceLoss1d(torch.nn.Module):
-    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10, kernel_size: int = 3):
-        super().__init__()
-        self.register_buffer('weight', weight)
-
-        self.channels = channels
-        if weight is None:
-            self.weight = None
-        else:
-            if not isinstance(weight, torch.Tensor):
-                self.weight = torch.tensor(weight)
-            else:
-                self.weight = weight
-            if self.weight.dim() == 1:
-                self.weight = self.weight[None,]
-        if reduction == 'mean':   self.reduction = torch.mean
-        elif reduction == 'sum':  self.reduction = torch.sum
-        elif reduction == 'none': self.reduction = lambda x: x
-        
-        # Define auxiliary loss
-        self.threshold = threshold
-        self.kernel_size = kernel_size
-        self.sigmoid = Sigmoid()
-        self.loss = MSELoss(reduction='none')
-        
-        # Define convolutional operation
-        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
-        
-        # Mark as non-trainable
-        for param in self.prewitt.parameters():
-            param.requires_grad = False
-
-        # Override weights
-        self.prewitt.weight[:,:,:] = 0.
-        for c in range(self.channels):
-            self.prewitt.weight[c,c, 0] = -1.
-            self.prewitt.weight[c,c,-1] =  1.
-
-    
-    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
-        # Move operation to device
-        self.prewitt = self.prewitt.to(target.device)
-
-        # Obtain sigmoid-ed input and target
-        input  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-        target = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-
-        # Retrieve boundaries
-        input_boundary = self.prewitt(input).abs()
-        target_boundary = self.prewitt(target).abs()
-
-        # Obtain sigmoid-ed input and target
-        input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-        target_boundary = self.sigmoid((target_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-
-        # Sum of elements alongside the spatial dimensions
-        input_elements = torch.flatten(input_boundary, start_dim=2).sum(-1)/2
-        target_elements = torch.flatten(target_boundary, start_dim=2).sum(-1)/2
-
-        # Apply class weights
-        if self.weight is not None:
-            # Assert compatible shapes
-            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
-            self.weight = self.weight.to(target.device)
-            input_elements = input_elements*self.weight
-            target_elements = target_elements*self.weight
-
-        # Obtain per-sample loss
-        loss = self.loss(input_elements, target_elements)
-
-        # Apply sample weight to samples
-        if sample_weight is not None:
-            loss *= sample_weight
-
-        # Obtain loss
-        return self.reduction(loss)
-
-
 class F1InstanceLoss1d(torch.nn.Module):
-    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, threshold: float = 10, kernel_size: int = 3):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3):
         super().__init__()
         self.register_buffer('weight', weight)
 
@@ -338,9 +260,7 @@ class F1InstanceLoss1d(torch.nn.Module):
         elif reduction == 'none': self.reduction = lambda x: x
         
         # Define auxiliary loss
-        self.threshold = threshold
         self.kernel_size = kernel_size
-        self.sigmoid = Sigmoid()
         
         # Define convolutional operation
         self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
@@ -360,17 +280,9 @@ class F1InstanceLoss1d(torch.nn.Module):
         # Move operation to device
         self.prewitt = self.prewitt.to(target.device)
 
-        # Soften input
-        input = self.sigmoid((input-0.5)*self.threshold)
-        target = self.sigmoid((target-0.5)*self.threshold)
-
         # Retrieve boundaries
         input_boundary = self.prewitt(input).abs()
         target_boundary = self.prewitt(target).abs()
-
-        # Obtain sigmoid-ed input and target
-        input_boundary  = self.sigmoid((input_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-        target_boundary = self.sigmoid((target_boundary-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
 
         # Sum of elements alongside the spatial dimensions
         input_elements = input_boundary.sum(-1)/4
@@ -391,9 +303,6 @@ class F1InstanceLoss1d(torch.nn.Module):
 
         # F1 loss
         loss = 1-(2*truepositive + 1)/(2*truepositive + falsepositive + falsenegative + 1)
-
-        # # Instance loss
-        # loss = (target_elements-input_elements).abs()/(target_elements+input_elements)
 
         # Sum over channels
         loss = loss.sum(-1)
@@ -480,122 +389,13 @@ class BoundDiceLoss2d(torch.nn.Module):
         return (loss_x+loss_y+loss_xy+loss_yx)/4
 
 
-class InstanceLoss2d(torch.nn.Module):
-    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10, kernel_size: int = 3):
-        super().__init__()
-        self.register_buffer('weight', weight)
-
-        # Save inputs
-        self.channels = channels
-        self.threshold = threshold
-        if weight is None:
-            self.weight = torch.ones((1,self.channels))
-        else:
-            if not isinstance(weight, torch.Tensor):
-                self.weight = torch.tensor(weight)
-            else:
-                self.weight = weight
-            if self.weight.dim() == 1:
-                self.weight = self.weight[None,]
-        if reduction == 'mean':   self.reduction = torch.mean
-        elif reduction == 'sum':  self.reduction = torch.sum
-        elif reduction == 'none': self.reduction = lambda x: x
-
-        # Check weights size
-        assert self.weight.size(-1) == channels, "The number of provided channels and the associated weights do not match"
-        
-        # Define auxiliary loss
-        self.kernel_size = kernel_size
-        self.sigmoid = Sigmoid()
-        self.loss = MSELoss(reduction='none')
-        
-        # Define convolutional operation
-        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
-        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
-        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
-
-        # Mark as non-trainable
-        for param in self.prewitt.parameters():  param.requires_grad = False
-        for param in self.prewittx.parameters(): param.requires_grad = False
-        for param in self.prewitty.parameters(): param.requires_grad = False
-
-        # Override weights to make Prewitt filters
-        self.prewitt.weight[...]  = 0.
-        self.prewittx.weight[...] = 0.
-        self.prewitty.weight[...] = 0.
-        for c in range(self.channels):
-            # border
-            self.prewitt.weight[c,c, 0]    = -1.
-            self.prewitt.weight[c,c,-1]    =  1.
-            # x
-            self.prewittx.weight[c,c, 0,0] = -1.
-            self.prewittx.weight[c,c,-1,0] =  1.
-            # y
-            self.prewitty.weight[c,c,0, 0] = -1.
-            self.prewitty.weight[c,c,0,-1] =  1.
-
-    
-    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
-        # Move operation to device
-        self.prewitt  =  self.prewitt.to(target.device)
-        self.prewittx = self.prewittx.to(target.device)
-        self.prewitty = self.prewitty.to(target.device)
-
-        # Obtain number of structures of the target
-        target_bound_x    = self.prewittx(target).abs()
-        # target_bound_x    = self.sigmoid((target_bound_x-0.5)*self.threshold)
-        target_bound_x_1d = self.prewitt(target_bound_x.sum(-2)).abs()
-        # target_bound_x_1d    = self.sigmoid((target_bound_x_1d-0.5)*self.threshold)
-        target_elements_x = torch.flatten(target_bound_x_1d, start_dim=2).sum(-1)/(4**2)
-
-        target_bound_y    = self.prewitty(target).abs()
-        # target_bound_y    = self.sigmoid((target_bound_y-0.5)*self.threshold)
-        target_bound_y_1d = self.prewitt(target_bound_y.sum(-1)).abs()
-        # target_bound_y_1d    = self.sigmoid((target_bound_y_1d-0.5)*self.threshold)
-        target_elements_y = torch.flatten(target_bound_y_1d, start_dim=2).sum(-1)/(4**2)
-
-        # Obtain number of structures of the input
-        input_bound_x     = self.prewittx(input).abs()
-        # input_bound_x     = self.sigmoid((input_bound_x-0.5)*self.threshold)
-        input_bound_x_1d  = self.prewitt(input_bound_x.sum(-2)).abs()
-        # input_bound_x_1d     = self.sigmoid((input_bound_x_1d-0.5)*self.threshold)
-        input_elements_x  = torch.flatten(input_bound_x_1d, start_dim=2).sum(-1)/(4**2)
-
-        input_bound_y     = self.prewitty(input).abs()
-        # input_bound_y     = self.sigmoid((input_bound_y-0.5)*self.threshold)
-        input_bound_y_1d  = self.prewitt(input_bound_y.sum(-1)).abs()
-        # input_bound_y_1d     = self.sigmoid((input_bound_y_1d-0.5)*self.threshold)
-        input_elements_y  = torch.flatten(input_bound_y_1d, start_dim=2).sum(-1)/(4**2)
-
-        # Apply class weights
-        if self.weight is not None:
-            # Assert compatible shapes
-            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
-            self.weight = self.weight.to(target.device)
-            input_elements_x  =  input_elements_x*self.weight
-            input_elements_y  =  input_elements_y*self.weight
-            target_elements_x = target_elements_x*self.weight
-            target_elements_y = target_elements_y*self.weight
-        
-        # Retrieve final loss
-        loss = (self.loss(input_elements_x,target_elements_x)+self.loss(input_elements_y,target_elements_y))/2
-
-        # Apply sample weight to samples
-        if sample_weight is not None:
-            loss *= sample_weight
-
-        # Obtain per-sample loss
-        return self.reduction(loss)
-
-
 class F1InstanceLoss2d(torch.nn.Module):
-    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', threshold: float = 10, kernel_size: int = 3):
+    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', kernel_size: int = 3):
         super().__init__()
         self.register_buffer('weight', weight)
 
         # Save inputs
         self.channels = channels
-        self.threshold = threshold
         if weight is None:
             self.weight = torch.ones((1,self.channels))
         else:
@@ -614,7 +414,6 @@ class F1InstanceLoss2d(torch.nn.Module):
         
         # Define auxiliary loss
         self.kernel_size = kernel_size
-        self.sigmoid = Sigmoid()
         
         # Define convolutional operation
         self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
@@ -647,35 +446,23 @@ class F1InstanceLoss2d(torch.nn.Module):
         self.prewitt  =  self.prewitt.to(target.device)
         self.prewittx = self.prewittx.to(target.device)
         self.prewitty = self.prewitty.to(target.device)
-
-        # Obtain sigmoid-ed input and target
-        input  = self.sigmoid((input-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
-        target = self.sigmoid((target-0.5)*self.threshold) # Rule of thumb for dividing the classes as much as possible
         
         # Obtain number of structures of the target
         target_bound_x    = self.prewittx(target).abs()
-        target_bound_x    = self.sigmoid((target_bound_x-0.5)*self.threshold)
         target_bound_x_1d = self.prewitt(target_bound_x.sum(-2)).abs()
-        target_bound_x_1d = self.sigmoid((target_bound_x_1d-0.5)*self.threshold)
         target_elements_x = torch.flatten(target_bound_x_1d, start_dim=2).sum(-1)/(4**2)
         
         target_bound_y    = self.prewitty(target).abs()
-        target_bound_y    = self.sigmoid((target_bound_y-0.5)*self.threshold)
         target_bound_y_1d = self.prewitt(target_bound_y.sum(-1)).abs()
-        target_bound_y_1d = self.sigmoid((target_bound_y_1d-0.5)*self.threshold)
         target_elements_y = torch.flatten(target_bound_y_1d, start_dim=2).sum(-1)/(4**2)
         
         # Obtain number of structures of the input
         input_bound_x     = self.prewittx(input).abs()
-        input_bound_x     = self.sigmoid((input_bound_x-0.5)*self.threshold)
         input_bound_x_1d  = self.prewitt(input_bound_x.sum(-2)).abs()
-        input_bound_x_1d  = self.sigmoid((input_bound_x_1d-0.5)*self.threshold)
         input_elements_x  = torch.flatten(input_bound_x_1d, start_dim=2).sum(-1)/(4**2)
         
         input_bound_y     = self.prewitty(input).abs()
-        input_bound_y     = self.sigmoid((input_bound_y-0.5)*self.threshold)
         input_bound_y_1d  = self.prewitt(input_bound_y.sum(-1)).abs()
-        input_bound_y_1d  = self.sigmoid((input_bound_y_1d-0.5)*self.threshold)
         input_elements_y  = torch.flatten(input_bound_y_1d, start_dim=2).sum(-1)/(4**2)
 
         # Apply class weights
@@ -688,10 +475,22 @@ class F1InstanceLoss2d(torch.nn.Module):
             target_elements_x = target_elements_x*self.weight
             target_elements_y = target_elements_y*self.weight
         
-        # Instance loss
-        loss_x = (target_elements_x-input_elements_x).abs()/(target_elements_x+input_elements_x)
-        loss_y = (target_elements_y-input_elements_y).abs()/(target_elements_y+input_elements_y)
+        # F1 loss
+        truepositive_x  = (target_elements_x-(target_elements_x-input_elements_x).clamp_min(0)).abs()
+        falsepositive_x = (input_elements_x-target_elements_x).clamp_min(0)
+        falsenegative_x = (target_elements_x-input_elements_x).clamp_min(0)
+
+        truepositive_y  = (target_elements_y-(target_elements_y-input_elements_y).clamp_min(0)).abs()
+        falsepositive_y = (input_elements_y-target_elements_y).clamp_min(0)
+        falsenegative_y = (target_elements_y-input_elements_y).clamp_min(0)
+
+        # F1 loss
+        loss_x = 1-(2*truepositive_x + 1)/(2*truepositive_x + falsepositive_x + falsenegative_x + 1)
+        loss_y = 1-(2*truepositive_y + 1)/(2*truepositive_y + falsepositive_y + falsenegative_y + 1)
         loss   = (loss_x+loss_y)/2
+
+        # Sum over channels
+        loss = loss.sum(-1)
 
         # Apply sample weight to samples
         if sample_weight is not None:
