@@ -91,7 +91,7 @@ class UpDownSample(object):
 
 
 class EqualizeHistogram(object):
-    def __init__(self, nbins: int = 5, mask = None):
+    def __init__(self, nbins: int = 256, mask = None):
         self.nbins = nbins
         self.mask = mask
 
