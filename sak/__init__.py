@@ -14,5 +14,5 @@ import sak.image
 import sak.signal
 import sak.visualization
 # import sak.data
-# import sak.wavelet
-# import sak.spectral
+# import sak.signal.wavelet
+# import sak.signal.spectral
