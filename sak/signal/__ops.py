@@ -17,9 +17,9 @@ def power(x: np.ndarray, axis=None) -> float:
     """Compute signal power"""
     return np.mean((x - np.median(x,axis=axis))**2,axis=axis)
 
-def pulse_train(n: int, width: int, offset: int = 0) -> np.ndarray:
+def pulse_train(n: int, width: int, offset: int = 0, amplitude: float = 1.0) -> np.ndarray:
     """Compute signal power"""
-    return np.arange(offset,n)%(2*width) < width
+    return amplitude*(np.arange(offset,n)%(2*width) < width)
 
 def get_mask_boundary(binary_mask: np.ndarray, axis=-1, aslist=True) -> Tuple[list,list]:
     binary_mask = binary_mask.astype(int)
