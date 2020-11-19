@@ -12,6 +12,16 @@ from sak.__ops import required
 from sak.__ops import check_required
 
 
+class none(object):
+    """Compose a random transform according to pre-specified config file"""
+
+    def __init__(self, *args, **kwargs):
+        pass
+
+    def __call__(self, *args):
+        return args
+
+
 class AugmentationComposer(object):
     """Compose a random transform according to pre-specified config file"""
 
