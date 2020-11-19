@@ -10,6 +10,7 @@ from .__ops import load_data
 from .__ops import save_data
 from .__ops import argsort_as
 
+import sak.image
 import sak.signal
 import sak.visualization
 # import sak.data
