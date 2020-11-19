@@ -17,7 +17,7 @@ def power(x: np.ndarray, axis=None) -> float:
     """Compute signal power"""
     return np.mean((x - np.median(x,axis=axis))**2,axis=axis)
 
-def pulse_train(n: int, period: int, offset: int = 0) -> np.ndarray:
+def pulse_train(n: int, period: int, width: int, offset: int = 0) -> np.ndarray:
     """Compute signal power"""
     return np.arange(offset,n)%(2*width) < width
 
