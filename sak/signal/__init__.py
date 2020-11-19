@@ -8,6 +8,7 @@ from .__ops import signed_minima
 from .__ops import sigmoid
 from .__ops import normal
 from .__ops import power
+from .__ops import pulse_train
 from .__ops import zero_crossings
 from .__ops import positive_zero_crossings
 from .__ops import negative_zero_crossings
