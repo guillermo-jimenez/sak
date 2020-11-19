@@ -479,29 +479,25 @@ class F1InstanceLoss2d(torch.nn.Module):
         input_bound_y_1d  = self.prewitt(input_bound_y.sum(-1)).abs()
         input_elements_y  = torch.flatten(input_bound_y_1d, start_dim=2).sum(-1)/(4**2)
 
+        # Aggregate x and y dimensions
+        input_elements  = input_elements_x + input_elements_y
+        target_elements = target_elements_x + target_elements_y
+
         # Apply class weights
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
             self.weight = self.weight.to(target.device)
-            input_elements_x  =  input_elements_x*self.weight
-            input_elements_y  =  input_elements_y*self.weight
-            target_elements_x = target_elements_x*self.weight
-            target_elements_y = target_elements_y*self.weight
-        
+            input_elements  =  input_elements*self.weight
+            target_elements = target_elements*self.weight
+            
         # F1 loss
-        truepositive_x  = (target_elements_x-(target_elements_x-input_elements_x).clamp_min(0)).abs()
-        falsepositive_x = (input_elements_x-target_elements_x).clamp_min(0)
-        falsenegative_x = (target_elements_x-input_elements_x).clamp_min(0)
-
-        truepositive_y  = (target_elements_y-(target_elements_y-input_elements_y).clamp_min(0)).abs()
-        falsepositive_y = (input_elements_y-target_elements_y).clamp_min(0)
-        falsenegative_y = (target_elements_y-input_elements_y).clamp_min(0)
+        truepositive  = (target_elements-(target_elements-input_elements).clamp_min(0)).abs()
+        falsepositive = (input_elements-target_elements).clamp_min(0)
+        falsenegative = (target_elements-input_elements).clamp_min(0)
 
         # F1 loss
-        loss_x = 1-(2*truepositive_x + 1)/(2*truepositive_x + falsepositive_x + falsenegative_x + 1)
-        loss_y = 1-(2*truepositive_y + 1)/(2*truepositive_y + falsepositive_y + falsenegative_y + 1)
-        loss   = (loss_x+loss_y)/2
+        loss = 1-(2*truepositive + 1)/(2*truepositive + falsepositive + falsenegative + 1)
 
         # Sum over channels
         loss = loss.sum(-1)
