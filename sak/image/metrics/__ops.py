@@ -1,9 +1,13 @@
+from typing import Tuple
 import numpy as np
+import cv2
 from scipy.spatial import cKDTree
+from scipy.spatial import ConvexHull
+
 
 """Borrowed from https://github.com/scikit-image/scikit-image/blob/2db874cc6485186b08d296887a8a91bb2f8865ec/skimage/metrics/set_metrics.py#L4-L51
    as it has not yet been implemented in my scikit-image version (0.17.2 vs 0.18.0)"""
-def hausdorff_distance(image0, image1):
+def hausdorff_distance(image0: np.ndarray, image1: np.ndarray) -> float:
     """Calculate the Hausdorff distance between nonzero elements of given images.
     The Hausdorff distance [1]_ is the maximum distance between any point on
     ``image0`` and its nearest point on ``image1``, and vice-versa.
@@ -45,4 +49,36 @@ def hausdorff_distance(image0, image1):
 
     return max(max(cKDTree(a_points).query(b_points, k=1)[0]),
                max(cKDTree(b_points).query(a_points, k=1)[0]))
+
+
+# https://arxiv.org/pdf/1908.02994.pdf
+def convexity(mask: np.ndarray) -> float:
+    # Convex hull
+    hull = ConvexHull(np.array(np.where(mask)).T)
+    hull_area = hull.volume
+    
+    # Mask
+    contours,_ = cv2.findContours(mask.astype('uint8'), 1, cv2.CHAIN_APPROX_SIMPLE)
+    mask_area = sum([cv2.contourArea(c) for c in contours])
+    
+    return mask_area/hull_area
+
+# https://arxiv.org/pdf/1908.02994.pdf
+def simplicity(mask: np.ndarray) -> float:
+    # Mask
+    contours,_ = cv2.findContours(mask.astype('uint8'), 1, cv2.CHAIN_APPROX_NONE)
+    mask_area = sum([cv2.contourArea(c) for c in contours])
+    mask_perimeter = sum([c.shape[0] for c in contours])
+    
+    return ((4*np.pi*mask_area)**(1/2))/mask_perimeter
+
+def elements(mask: np.ndarray) -> int:
+    contours,_ = cv2.findContours(mask.astype('uint8'), 1, cv2.CHAIN_APPROX_SIMPLE)
+    return len(contours)
+
+def instance_metrics(input_elements: float, target_elements: float) -> Tuple[float,float,float]:
+    truepositive  = np.abs(target_elements-max([(target_elements-input_elements),0]))
+    falsepositive = max([input_elements-target_elements,0])
+    falsenegative = max([target_elements-input_elements,0])
+    return truepositive, falsepositive, falsenegative
 
