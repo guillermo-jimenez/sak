@@ -1,1 +1,1 @@
-from .__ops import barch_xcorr
+from .__ops import batch_xcorr
