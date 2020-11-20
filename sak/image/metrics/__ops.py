@@ -82,3 +82,12 @@ def instance_metrics(input_elements: float, target_elements: float) -> Tuple[flo
     falsenegative = max([target_elements-input_elements,0])
     return truepositive, falsepositive, falsenegative
 
+def precision(tp: int, fp: int, fn: int) -> float:
+    return tp/(tp+fp)
+
+def recall(tp: int, fp: int, fn: int) -> float:
+    return tp/(tp+fn)
+
+def f1_score(tp: int, fp: int, fn: int) -> float:
+    return tp/(tp+(fp+fn)/2)
+
