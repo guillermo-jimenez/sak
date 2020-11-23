@@ -243,7 +243,7 @@ class UpDownSample(object):
     def __init__(self, max_exponent: int = 2):
         self.max_exponent = max_exponent
 
-    def __call__(self, x: torch.Tensor):
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
         factor = random.randint(1,self.max_exponent)
         x = torch.nn.AvgPool2d(kernel_size = 2**factor, stride = 2**factor, padding = max([factor//2-1,0]))(x.clone())
         x = torch.nn.Upsample(scale_factor = 2**factor)(x)
