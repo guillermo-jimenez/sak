@@ -30,6 +30,47 @@ class HistogramMatching(object):
         return out
 
 
+class SegmentationShift:
+    def __init__(self, ratio_x: float = 0.0, ratio_y: float = 0.0):
+        self.ratio_x = ratio_x
+        self.ratio_y = ratio_y
+        assert (ratio_x <= 1) and (ratio_x >= 0), "Ratios should be in the interval [0,1]"
+        assert (ratio_y <= 1) and (ratio_y >= 0), "Ratios should be in the interval [0,1]"
+
+    def __call__(self, x: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        assert x.shape[-2:] == y.shape[-2:], "The shapes of the input tensors do not coincide"
+        
+        # Retrieve input shapes
+        bs,ch,h,w = x.shape
+        
+        # Obtain the number of samples to move
+        shift_x = round(np.random.uniform(-self.ratio_x, self.ratio_x)*w)
+        shift_y = round(np.random.uniform(-self.ratio_y, self.ratio_y)*h)
+        print("{}, {}".format(shift_x,shift_y))
+        
+        # Shift tensors X dimensions
+        if shift_x > 0: 
+            x[...,:int(shift_x),:] = 0
+            y[...,:int(shift_x),:] = 0
+        else:
+            x[...,int(shift_x):,:] = 0
+            y[...,int(shift_x):,:] = 0
+
+        # Shift tensors X dimensions
+        if shift_y > 0: 
+            x[...,:,:int(shift_y)] = 0
+            y[...,:,:int(shift_y)] = 0
+        else:
+            x[...,:,int(shift_y):] = 0
+            y[...,:,int(shift_y):] = 0
+            
+        # Roll tensors
+        x = torch.roll(x,(-shift_x,-shift_y),dims=(-2,-1))
+        y = torch.roll(y,(-shift_x,-shift_y),dims=(-2,-1))
+        
+        return x,y
+
+
 class AdjustGamma(object):
     def __init__(self, gamma: float = 2, noise: float = 0.5):
         self.gamma = gamma

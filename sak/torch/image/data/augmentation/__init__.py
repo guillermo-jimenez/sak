@@ -5,3 +5,5 @@ from .__ops import AffineTransform
 from .__ops import UpDownSample
 from .__ops import EqualizeHistogram
 from .__ops import SkimageLambda
+from .__ops import SegmentationShift
+
