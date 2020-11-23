@@ -1,6 +1,10 @@
+from typing import Union, Tuple, List, Iterable, Callable, Any
+
+import cv2
 import math
 import torch
 import numpy
+import random
 import sak.data
 import sak.signal
 import skimage.transform
@@ -46,7 +50,6 @@ class SegmentationShift:
         # Obtain the number of samples to move
         shift_x = round(np.random.uniform(-self.ratio_x, self.ratio_x)*w)
         shift_y = round(np.random.uniform(-self.ratio_y, self.ratio_y)*h)
-        print("{}, {}".format(shift_x,shift_y))
         
         # Shift tensors X dimensions
         if shift_x > 0: 
@@ -70,6 +73,122 @@ class SegmentationShift:
         
         return x,y
 
+
+class SegmentationFlip:
+    def __init__(self, proba_x: float = 0.0, proba_y: float = 0.0):
+        self.proba_x = proba_x
+        self.proba_y = proba_y
+        assert (proba_x <= 1) and (proba_x >= 0), "Probabilities should be in the interval [0,1]"
+        assert (proba_y <= 1) and (proba_y >= 0), "Probabilities should be in the interval [0,1]"
+
+    def __call__(self, x: torch.Tensor, y: torch.Tensor):
+        assert x.shape[-2:] == y.shape[-2:], "The shapes of the input tensors do not coincide"
+        
+        # Retrieve input shapes
+        bs,ch,h,w = x.shape
+        
+        # Obtain the number of samples to move
+        flip_x = np.random.rand() <= self.proba_x
+        flip_y = np.random.rand() <= self.proba_y
+        
+        # Flip tensors dimensions
+        if flip_x: 
+            x = torch.flip(x,[-1])
+            y = torch.flip(y,[-1])
+        if flip_y: 
+            x = torch.flip(x,[-2])
+            y = torch.flip(y,[-2])
+        
+        return x,y
+
+
+class ClipIntensities:
+    def __init__(self, threshold: float = 0.0, mode: str = 'max'):
+        assert (threshold <= 1) and (threshold >= 0), "Threshold should be in the interval [0,1]"
+        assert mode.lower() in ['min', 'max'], "Mode can only be in ['min', 'max']"
+        self.threshold = threshold
+        self.ismax = 1 if mode.lower() == 'max' else 0
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        # Get maximum value (very dirty)
+        maxval = 255 if x.max() > 1 else 1.
+        
+        # A bit more flexibility
+        threshold = np.random.uniform(-self.threshold/10,self.threshold/10)+self.threshold
+        
+        if self.ismax:
+            return x.clamp_max(maxval*threshold)
+        else:
+            return x.clamp_min(maxval*threshold)
+
+
+class BlurImage:
+    def __init__(self, kernel_size: Union[int, Iterable] = None, background_value: float = None):
+        self.kernel_size = kernel_size
+        self.background_value = background_value
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        # Get background mask
+        if self.background_value is not None:
+            background_mask = (x == (self.background_value))
+
+        # Output structure
+        out_x = torch.zeros_like(x)
+        
+        # Iterate over samples and channels
+        for b in range(x.shape[0]):
+            for c in range(x.shape[1]):
+                if self.kernel_size is None:
+                    kernel_size = [random.randrange(3,7+1,2) for _ in range(x.ndim-2)]
+                else:
+                    if isinstance(self.kernel_size, int):
+                        kernel_size = [self.kernel_size for _ in range(x.ndim-2)]
+                    elif isinstance(self.kernel_size, np.ndarray):
+                        assert self.kernel_size.size == x.ndim-2
+                        kernel_size = self.kernel_size.tolist()
+                    else:
+                        assert len(self.kernel_size) == x.ndim-2
+                        kernel_size = list(self.kernel_size)
+                
+                out_x[b,c,] = torch.tensor(cv2.blur(x[b,c].numpy(),tuple(kernel_size)))
+                
+        if self.background_value is not None:
+            out_x[background_mask] = self.background_value
+        
+        return out_x
+        
+        
+class EnhanceBorders:
+    def __init__(self, background_value: float = None, sigma_s: float = None, sigma_r: float = None):
+        self.background_value = background_value
+        self.sigma_s = sigma_s
+        self.sigma_r = sigma_r
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        # Get background mask
+        if self.background_value is not None:
+            background_mask = (x == (self.background_value))
+            
+        # Output structure
+        out_x = torch.zeros_like(x)
+        
+        # Iterate over samples and channels
+        for b in range(x.shape[0]):
+            for c in range(x.shape[1]):
+                out_x[b,c,] = torch.tensor(
+                    cv2.detailEnhance(
+                        np.repeat(x[b,c].numpy()[...,None],3,-1),
+                        None,
+                        self.sigma_s,
+                        self.sigma_r,
+                    )
+                )[:,:,0]
+                
+        if self.background_value is not None:
+            out_x[background_mask] = self.background_value
+        
+        return out_x
+        
 
 class AdjustGamma(object):
     def __init__(self, gamma: float = 2, noise: float = 0.5):
@@ -121,13 +240,13 @@ class AffineTransform(object):
 
 
 class UpDownSample(object):
-    def __init__(self, max_factor: int = 5):
-        self.max_factor = max_factor
+    def __init__(self, max_exponent: int = 2):
+        self.max_exponent = max_exponent
 
     def __call__(self, x: torch.Tensor):
-        factor = np.random.randint(2,self.max_factor+1)//2*2
-        x = torch.nn.AvgPool2d(kernel_size = factor, stride = factor, padding = factor//2)(x.clone())
-        x = torch.nn.Upsample(scale_factor = factor)(x)
+        factor = random.randint(1,self.max_exponent)
+        x = torch.nn.AvgPool2d(kernel_size = 2**factor, stride = 2**factor, padding = max([factor//2-1,0]))(x.clone())
+        x = torch.nn.Upsample(scale_factor = 2**factor)(x)
         return x
 
 

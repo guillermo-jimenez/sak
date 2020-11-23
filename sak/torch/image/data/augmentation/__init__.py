@@ -6,4 +6,7 @@ from .__ops import UpDownSample
 from .__ops import EqualizeHistogram
 from .__ops import SkimageLambda
 from .__ops import SegmentationShift
-
+from .__ops import SegmentationFlip
+from .__ops import ClipIntensities
+from .__ops import BlurImage
+from .__ops import EnhanceBorders
