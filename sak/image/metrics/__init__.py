@@ -6,3 +6,4 @@ from .__ops import instance_metrics
 from .__ops import precision
 from .__ops import recall
 from .__ops import f1_score
+from .__ops import get_boundaries

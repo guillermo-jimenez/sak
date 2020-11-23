@@ -91,3 +91,29 @@ def recall(tp: int, fp: int, fn: int) -> float:
 def f1_score(tp: int, fp: int, fn: int) -> float:
     return tp/(tp+(fp+fn)/2)
 
+def get_boundaries(mask: np.ndarray, mode: int = cv2.RETR_TREE, method: int = cv2.CHAIN_APPROX_TC89_KCOS) -> np.ndarray:
+    if mask.ndim == 2:
+        mask = mask[None,]
+        
+    mask = skimage.exposure.rescale_intensity(mask, out_range='uint8')
+    
+    output_contours = []
+    for i,channel in enumerate(mask):
+        # Find contour
+        cnt = cv2.findContours(channel,mode,method)
+        
+        # Get largest connected component
+        cnt = cnt[0][0]
+        
+        # Squeeze irrelevant dimensions
+        cnt = cnt.squeeze()
+        
+        # Close circle
+        cnt = np.vstack((cnt,cnt[0,:]))
+        
+        # Return
+        output_contours.append(cnt)
+        
+    return output_contours
+    
+    
