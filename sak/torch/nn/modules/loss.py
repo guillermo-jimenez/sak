@@ -202,8 +202,6 @@ class DiceLoss(torch.nn.Module):
 class BoundDiceLoss1d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, kernel_size: int = 1):
         super().__init__()
-        self.register_buffer('weight', weight)
-
         # Save inputs
         self.channels = channels
         self.reduction = reduction
@@ -243,8 +241,6 @@ class BoundDiceLoss1d(torch.nn.Module):
 class BoundDiceLoss2d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', eps: float = 1e-6, weight: Iterable = None, diagonal: bool = False, kernel_size: int = 1):
         super().__init__()
-        self.register_buffer('weight', weight)
-
         # Save inputs
         self.channels = channels
         self.reduction = reduction
@@ -331,8 +327,6 @@ class BoundDiceLoss2d(torch.nn.Module):
 class F1InstanceLoss1d(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3):
         super().__init__()
-        self.register_buffer('weight', weight)
-
         self.channels = channels
         if weight is None:
             self.weight = None
@@ -406,8 +400,6 @@ class F1InstanceLoss1d(torch.nn.Module):
 class F1InstanceLoss2d(torch.nn.Module):
     def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', kernel_size: int = 3):
         super().__init__()
-        self.register_buffer('weight', weight)
-
         # Save inputs
         self.channels = channels
         if weight is None:
