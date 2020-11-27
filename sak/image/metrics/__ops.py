@@ -1,6 +1,8 @@
 from typing import Tuple
 import numpy as np
 import cv2
+import skimage
+import skimage.exposure
 from scipy.spatial import cKDTree
 from scipy.spatial import ConvexHull
 
