@@ -121,6 +121,10 @@ def standard(
     if header is not None:
         [ax[i%6][i//6].set_title(header[i]) for i in range(len(header))]
 
+    # Set y ticks to the right in the right column
+    for i in range(6):
+        ax[i%6][1].yaxis.tick_right()
+
     # Set limits
     [[ax[i,j].set_xlim([x[0],x[-1]]) for j in range(ax.shape[1])] for i in range(ax.shape[0])]
 
