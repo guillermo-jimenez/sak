@@ -1,7 +1,13 @@
+from typing import Tuple, List, Iterable
+from numbers import Number
+
 import sak
+from numpy import array
 from typing import Any
 from typing import List
 from typing import Tuple
+from torch import tensor
+from torch import as_strided
 from torch import Tensor
 from torch import Size
 from torch import exp
@@ -56,6 +62,65 @@ class Concatenate(Module):
         return cat(x_list, dim=self.dim)
         
         
+class ViewAsWindows(Module):
+    """Inspired from skimage.util.view_as_windows. Return unexpensive view of the tensor for iterative purposes"""
+    def __init__(self, window_shape: Tuple = required, step: int = 1):
+        super(ViewAsWindows, self).__init__()
+        if isinstance(window_shape, Number):
+            self.window_shape = (window_shape,)
+        else:
+            self.window_shape = window_shape
+        self.step = step
+    
+    def forward(self, x: Tensor) -> List[Tensor]:
+        # -- basic checks on arguments
+        if not isinstance(x, Tensor):
+            raise TypeError("`x` must be a torch tensor")
+
+        ndim = x.ndim
+        window_shape = self.window_shape
+        step = int(self.step)
+        
+        if isinstance(window_shape, Number):
+            window_shape = (window_shape,) * ndim
+        if not (len(window_shape) == ndim):
+            window_shape = tuple([x.shape[0],x.shape[1]] + [ws for ws in window_shape])
+
+            if not (len(window_shape) == ndim):
+                raise ValueError("`window_shape` is incompatible with `x.shape`")
+
+        if isinstance(step, Number):
+            if step < 1:
+                raise ValueError("`step` must be >= 1")
+            step = tuple([1,1] + [step] * (ndim-2))
+        if len(step) != ndim:
+            raise ValueError("`step` is incompatible with `x.shape`")
+
+        arr_shape = tensor(x.shape)
+        window_shape = array(window_shape, dtype=int)
+
+        if ((arr_shape - window_shape) < 0).any():
+            raise ValueError("`window_shape` is too large")
+
+        if ((window_shape - 1) < 0).any():
+            raise ValueError("`window_shape` is too small")
+
+        # -- build rolling window view
+        slices = tuple(slice(None, None, st) for st in step)
+        window_strides = array(x.stride())
+
+        indexing_strides = x[slices].stride()[2:]
+
+        win_indices_shape = (((array(x.shape) - array(window_shape))
+                              // array(step)) + 1)[2:]
+
+        new_shape = tuple(list(win_indices_shape) + list(window_shape))
+        strides = tuple(list(indexing_strides) + list(window_strides))
+
+        y = as_strided(x, size=new_shape, stride=strides)
+        return y
+        
+
 class Regularization(Module):
     def __init__(self, operations: list):
         super(Regularization, self).__init__()
