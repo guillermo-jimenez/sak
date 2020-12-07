@@ -97,7 +97,7 @@ class ViewAsWindows(Module):
         if len(step) != ndim:
             raise ValueError("`step` is incompatible with `x.shape`")
 
-        arr_shape = tensor(x.shape)
+        arr_shape = array(x.shape)
         window_shape = array(window_shape, dtype=int)
 
         if ((arr_shape - window_shape) < 0).any():
