@@ -62,6 +62,23 @@ class Concatenate(Module):
         return cat(x_list, dim=self.dim)
         
         
+class OperationIterator(Module):
+    def __init__(self, operation: dict = required, iterator: dict = required):
+        super(OperationIterator, self).__init__()
+        # Check required inputs
+        check_required(self, {"operation": operation, "iterator": iterator})
+        
+        self.operation = sak.from_dict(operation)
+        self.iterator = sak.from_dict(iterator)
+        
+    def forward(self, x: Tensor) -> List[Tensor]:
+        output = []
+        for i,xhat in enumerate(self.iterator(x)):
+            output.append(self.operation(xhat))
+            
+        return output
+
+
 class ViewAsWindows(Module):
     """Inspired/partly copied from skimage.util.view_as_windows. 
     Returns unexpensive view of the tensor for iterative purposes"""
