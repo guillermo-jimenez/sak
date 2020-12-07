@@ -63,7 +63,8 @@ class Concatenate(Module):
         
         
 class ViewAsWindows(Module):
-    """Inspired from skimage.util.view_as_windows. Return unexpensive view of the tensor for iterative purposes"""
+    """Inspired/partly copied from skimage.util.view_as_windows. 
+    Returns unexpensive view of the tensor for iterative purposes"""
     def __init__(self, window_shape: Tuple = required, step: int = 1):
         super(ViewAsWindows, self).__init__()
         if isinstance(window_shape, Number):
