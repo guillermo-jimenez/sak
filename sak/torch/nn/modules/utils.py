@@ -122,6 +122,59 @@ class ViewAsWindows(Module):
         return y
         
 
+class ViewDimensionAsWindows(Module):
+    """Inspired/partly copied from skimage.util.view_as_windows. 
+    Returns unexpensive view of the tensor for iterative purposes"""
+    def __init__(self, window_shape: int = required, dim: int = -1, step: int = 1):
+        super(ViewDimensionAsWindows, self).__init__()
+        self.window_shape = window_shape
+        self.step = step
+        self.dim = dim
+        
+        assert isinstance(window_shape, int), f"The provided value for input window_shape is invalid. Provided {type(window_shape)}; required int"
+        assert isinstance(dim, int), f"The provided value for input dim is invalid. Provided {type(dim)}; required int"
+        assert isinstance(step, int), f"The provided value for input step is invalid. Provided {type(step)}; required int"
+    
+    def forward(self, x: Tensor) -> List[Tensor]:
+        # -- basic checks on arguments
+        if not isinstance(x, Tensor):
+            raise TypeError("`x` must be a torch tensor")
+
+        ndim = x.ndim
+        dim = self.dim
+        
+        # Determine window shape
+        window_shape = list(x.shape)
+        window_shape[dim] = self.window_shape
+
+        # Determine step size
+        step = [1]*(ndim)
+        step[dim] = self.step
+
+        arr_shape = array(x.shape)
+        window_shape = array(window_shape, dtype=int)
+
+        if ((arr_shape - window_shape) < 0).any():
+            raise ValueError("`window_shape` is too large")
+
+        if ((window_shape - 1) < 0).any():
+            raise ValueError("`window_shape` is too small")
+
+        # -- build rolling window view
+        slices = tuple(slice(None, None, st) for st in step)
+        window_strides = array(x.stride())
+
+        indexing_strides = [x[slices].stride()[dim]]
+
+        win_indices_shape = [(((array(x.shape) - array(window_shape))
+                                  // array(step)) + 1)[dim]]
+        new_shape = tuple(list(win_indices_shape) + list(window_shape))
+        strides = tuple(list(indexing_strides) + list(window_strides))
+
+        y = as_strided(x, size=new_shape, stride=strides)
+        return y
+        
+
 class Regularization(Module):
     def __init__(self, operations: list):
         super(Regularization, self).__init__()
