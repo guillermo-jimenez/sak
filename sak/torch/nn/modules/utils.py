@@ -1,4 +1,4 @@
-from typing import Tuple, List, Iterable
+from typing import Tuple, List, Iterable, Union
 from numbers import Number
 
 import sak
@@ -229,8 +229,18 @@ class Add(Module):
     def __init__(self, *args, **kwargs):
         super(Add, self).__init__()
 
-    def forward(self, x: Tensor, y: Tensor) -> Tensor:
-        return x + y
+    def forward(self, x: Union[Tensor, List, Tuple], y: Tensor = None) -> Tensor:
+        if y is None:
+            if isinstance(x, List) or isinstance(x, Tuple):
+                out = 0
+                for xhat in x:
+                    out += xhat
+                return out
+            else:
+                raise ValueError("Incorrect arguments")
+        else:
+            return x * y
+
 
 
 class Multiply(Module):
@@ -253,8 +263,17 @@ class Multiply(Module):
     def __init__(self, *args, **kwargs):
         super(Multiply, self).__init__()
 
-    def forward(self, x: Tensor, y: Tensor) -> Tensor:
-        return x * y
+    def forward(self, x: Union[Tensor, List, Tuple], y: Tensor = None) -> Tensor:
+        if y is None:
+            if isinstance(x, List) or isinstance(x, Tuple):
+                out = 1
+                for xhat in x:
+                    out *= xhat
+                return out
+            else:
+                raise ValueError("Incorrect arguments")
+        else:
+            return x * y
 
 
 class Squeeze(Module):
