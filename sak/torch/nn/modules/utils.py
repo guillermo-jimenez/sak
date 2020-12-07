@@ -61,7 +61,7 @@ class Concatenate(Module):
     def forward(self, *x_list: List[Tensor]) -> Tensor:
         return cat(x_list, dim=self.dim)
         
-        
+
 class OperationIterator(Module):
     def __init__(self, operation: dict = required, iterator: dict = required):
         super(OperationIterator, self).__init__()
@@ -72,10 +72,7 @@ class OperationIterator(Module):
         self.iterator = sak.from_dict(iterator)
         
     def forward(self, x: Tensor) -> List[Tensor]:
-        output = []
-        for i,xhat in enumerate(self.iterator(x)):
-            output.append(self.operation(xhat))
-            
+        output = [self.operation(xhat) for xhat in self.iterator(x)]
         return output
 
 
