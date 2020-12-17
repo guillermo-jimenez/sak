@@ -53,18 +53,23 @@ def min_max_ratio(X: np.ndarray, axis: Tuple = None) -> np.ndarray:
     return 1-np.min([np.abs(maximum),np.abs(minimum)])/np.max([np.abs(maximum),np.abs(minimum)])
     
 def on_off_correction(X: np.ndarray) -> np.ndarray:
-    X = np.copy(X)
+    output = np.copy(X)
     
-    if X.ndim == 1:
-        X = X[:,None]
-    
-    for i in range(X.shape[-1]):
-        on = X[0,i]
-        off = X[-1,i]
+    if output.ndim == 1:
+        output = output[:,None]
 
-        X[:,i] += np.linspace(-on,-off,X.shape[0])
-        
-    return X.squeeze(axis=tuple(range(1,X.ndim)))
+    # Compute onsets and offsets
+    onsets = output[0,:]
+    offsets = output[-1,:]
+
+    # Correct inputs
+    output += np.linspace(-onsets,-offsets,output.shape[0])
+
+    # Squeeze if necessary
+    if output.ndim != X.ndim:
+        return output.squeeze(axis=tuple(range(1,output.ndim)))
+    else:
+        return output
     
 def abs_max_is_positive(X: np.ndarray, axis: int = None) -> np.ndarray:
     X = flatten_along_axis(X, axis)
