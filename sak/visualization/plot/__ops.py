@@ -80,7 +80,8 @@ def segmentation(
     # Define figure correctly
     if fig is None:
         fig = plt.figure(**kwargs)
-    ax = fig.gca()
+    if ax is None:
+        ax = fig.gca()
 
     # Plot the signal information
     ax.plot(x)
