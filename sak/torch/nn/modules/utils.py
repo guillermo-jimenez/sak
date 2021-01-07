@@ -11,6 +11,9 @@ from torch import as_strided
 from torch import Tensor
 from torch import Size
 from torch import exp
+from torch import linspace
+from torch import ones_like
+from torch import sum
 from torch import cat
 from torch import randn_like
 from torch.nn import Module
@@ -23,6 +26,26 @@ from sak.__ops import check_required
 Order of operations
 https://github.com/ducha-aiki/caffenet-benchmark/blob/master/batchnorm.md
 """
+
+
+class SoftArgmaxAlongAxis(Module):
+    def __init__(self, axis: int, beta: float = 10):
+        self.axis = axis
+        self.beta = beta
+    
+    def __call__(self, x: Tensor) -> Tensor:
+        # Obtain per-pixel softmax of the input tensor alongside axis
+        exponential = exp(self.beta*x)
+        softmax = exponential/sum(exponential, axis=self.axis).unsqueeze(self.axis)
+        
+        # Obtain directional ramp
+        directional = ones_like(x)*linspace(0,x.shape[self.axis],x.shape[self.axis])[:,None]
+        
+        # Obtain the argmax alongside axis
+        argmax = sum(softmax*directional, axis=self.axis)
+        
+        return argmax
+
 
 class Dropout1d(Module):
     """Applies one-dimensional spatial dropout"""

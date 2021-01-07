@@ -14,4 +14,4 @@ from .modules.modules import ImagePooling1d,                  ImagePooling2d,   
                              AdaptiveAvgPoolAttention1d,      AdaptiveAvgPoolAttention2d,      AdaptiveAvgPoolAttention3d, \
                              PointwiseAttention1d,            PointwiseAttention2d,            PointwiseAttention3d
 from .modules.composers import ModelGraph, Sequential, Parallel
-from .modules.utils import Lambda, Concatenate, ViewAsWindows, ViewDimensionAsWindows, OperationIterator, Regularization, Reparameterize, none, Add, Multiply, Squeeze, Unsqueeze, View, UnFlatten, Dropout1d
+from .modules.utils import SoftArgmaxAlongAxis, Lambda, Concatenate, ViewAsWindows, ViewDimensionAsWindows, OperationIterator, Regularization, Reparameterize, none, Add, Multiply, Squeeze, Unsqueeze, View, UnFlatten, Dropout1d
