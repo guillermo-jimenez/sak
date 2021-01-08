@@ -66,6 +66,55 @@ class CompoundLoss(torch.nn.Module):
         return loss
 
 
+class XCorrLoss(torch.nn.Module):
+    def __init__(self, reduction: str = 'mean', weight: Iterable = None):
+        super().__init__()
+        self.axes = string.ascii_lowercase
+        if weight is None:
+            self.weight = None
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+
+            
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None) -> torch.Tensor:
+        if input.shape != target.shape:
+            raise ValueError("Tensor shapes do not coincide")
+
+        # Define einsum operation
+        operation = f"{self.axes[:input.ndim]},{self.axes[:input.ndim]}->{self.axes[:2]}"
+        
+        # Obtain the normed cross-correlation
+        xcorr  = torch.einsum(operation,input,target)
+        norm   = torch.sqrt(torch.einsum(operation,input,input) * torch.einsum(operation,target,target))
+        loss   = 1-xcorr/norm # The larger, positive xcorr (in range [-1,1]), the lower the loss
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            self.weight = self.weight.to(target.device)
+            loss = loss*self.weight
+
+        # Sum over channels
+        loss = loss.sum(-1)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            if not isinstance(sample_weight, torch.Tensor):
+                sample_weight = torch.tensor(sample_weight).to(input.device)
+            loss *= sample_weight
+
+        # Obtain loss
+        return self.reduction(loss)
+
 class PearsonCorrelationLoss: # Stupid wrapper to homogeinize code with the imported classes
     def __init__(self):
         pass

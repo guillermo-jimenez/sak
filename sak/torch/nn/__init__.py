@@ -1,5 +1,5 @@
 from torch.nn import *
-from .modules.loss import CompoundLoss, ConstantLoss, PearsonCorrelationLoss, KLD_MSE, KLD_BCE, KLDivergence, DiceLoss, BoundDiceLoss1d, F1InstanceLoss1d, BoundDiceLoss2d, F1InstanceLoss2d
+from .modules.loss import CompoundLoss, XCorrLoss, ConstantLoss, PearsonCorrelationLoss, KLD_MSE, KLD_BCE, KLDivergence, DiceLoss, BoundDiceLoss1d, F1InstanceLoss1d, BoundDiceLoss2d, F1InstanceLoss2d
 from .modules.models import CNN, DNN, DCC, Residual, SelfAttention
 from .modules.modules import ImagePooling1d,                  ImagePooling2d,                  ImagePooling3d, \
                              PointwiseConv1d,                 PointwiseConv2d,                 PointwiseConv3d, \
