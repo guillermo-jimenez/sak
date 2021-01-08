@@ -3,6 +3,7 @@ import numpy as np
 import torch 
 import torch.nn
 import sak
+import string
 from torch.nn import Conv1d
 from torch.nn import Conv2d
 from torch.nn import Conv3d
@@ -65,7 +66,6 @@ class CompoundLoss(torch.nn.Module):
             
         return loss
 
-
 class XCorrLoss(torch.nn.Module):
     def __init__(self, reduction: str = 'mean', weight: Iterable = None):
         super().__init__()
@@ -82,7 +82,6 @@ class XCorrLoss(torch.nn.Module):
         if reduction == 'mean':   self.reduction = torch.mean
         elif reduction == 'sum':  self.reduction = torch.sum
         elif reduction == 'none': self.reduction = lambda x: x
-
             
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None) -> torch.Tensor:
         if input.shape != target.shape:
