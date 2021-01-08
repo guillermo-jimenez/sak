@@ -30,6 +30,7 @@ https://github.com/ducha-aiki/caffenet-benchmark/blob/master/batchnorm.md
 
 class SoftArgmaxAlongAxis(Module):
     def __init__(self, axis: int, beta: float = 10):
+        super(SoftArgmaxAlongAxis, self).__init__()
         self.axis = axis
         self.beta = beta
     
