@@ -8,6 +8,8 @@ def aha(quantity: list, in_path: str, out_path: str, colormap: str = 'Reds', col
     if len(quantity) != 16:
         raise ValueError("Only intended to print values to AHA segments")
 
+    # NOTE TO SELF: to check which is the correct "header", simply `print(root)` and will show sth like <Element '{http://www3.medical.philips.com}restingecgdata' at 0x7f5906e247c0>
+
     # Retrieve colormap
     cmap = get_cmap(colormap, color_resolution+10)
     
