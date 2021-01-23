@@ -4,6 +4,13 @@ import numpy as np
 import pickle
 import importlib
 
+
+def invert_dict(dic: dict) -> dict:
+    inv_map = {}
+    for k, v in dic.items():
+        inv_map[v] = dic.get(v, []) + [k]
+    return inv_map
+
 def as_tuple(*args: Tuple[Any]) -> Tuple:
     """Returns variable number of inputs as a tuple. Useful to load from json. Usage:
    
