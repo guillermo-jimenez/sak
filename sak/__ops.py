@@ -6,10 +6,10 @@ import importlib
 
 
 def invert_dict(dic: dict) -> dict:
-    inv_map = {}
+    inv_dic = {}
     for k, v in dic.items():
-        inv_map[v] = dic.get(v, []) + [k]
-    return inv_map
+        inv_dic[v] = dic.get(v, []) + [k]
+    return inv_dic
 
 def as_tuple(*args: Tuple[Any]) -> Tuple:
     """Returns variable number of inputs as a tuple. Useful to load from json. Usage:
