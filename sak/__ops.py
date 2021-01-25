@@ -14,12 +14,9 @@ def load_config(path: str) -> dict:
         config = json.load(f)
 
     # Get savedir string
-    if "savedir" in config:
-        str_savedir = 'savedir'
-    elif "save_directory" in config:
-        str_savedir = 'save_directory'
-    else:
-        raise ValueError("Configuration file should include either the 'savedir' or 'save_directory' fields [case-sensitive]")
+    if "savedir" in execution:          str_savedir = 'savedir'
+    elif "save_directory" in execution: str_savedir = 'save_directory'
+    else: raise ValueError("Configuration file should include either the 'savedir' or 'save_directory' fields [case-sensitive]")
 
     # Expand user to avoid linux's ~ as alias to /home/$USER
     if "basedir" in config:
