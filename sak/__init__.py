@@ -8,6 +8,7 @@ from .__ops import map_upper
 from .__ops import get_tqdm
 from .__ops import from_dict
 from .__ops import load_data
+from .__ops import load_config
 from .__ops import save_data
 from .__ops import argsort_as
 

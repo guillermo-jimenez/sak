@@ -1,9 +1,46 @@
 from typing import Any, Tuple, List
 import pandas as pd
 import numpy as np
+import os
+import json
+import pathlib
 import pickle
 import importlib
 
+
+def load_config(path: str) -> dict:
+    # Load json
+    with open(path, "r") as f:
+        config = json.load(f)
+
+    # Get savedir string
+    if "savedir" in config:
+        str_savedir = 'savedir'
+    elif "save_directory" in config:
+        str_savedir = 'save_directory'
+    else:
+        raise ValueError("Configuration file should include either the 'savedir' or 'save_directory' fields [case-sensitive]")
+
+    # Expand user to avoid linux's ~ as alias to /home/$USER
+    if "basedir" in config:
+        config["basedir"] = os.path.expanduser(config["basedir"])
+
+    if "datadir" in config:
+        config["datadir"] = os.path.expanduser(config["datadir"])
+
+    if str_savedir in config:
+        config[str_savedir] = os.path.expanduser(config[str_savedir])
+
+        # Split path
+        root,file = os.path.split(path)
+        fname,ext = os.path.splitext(file)
+        
+        # Change path to contain model name
+        config[str_savedir] = os.path.join(config[str_savedir], fname)
+        if not os.path.isdir(config[str_savedir]):
+            pathlib.Path(config[str_savedir]).mkdir(parents=True, exist_ok=True)
+
+    return config
 
 def invert_dict(dic: dict) -> dict:
     inv_dic = {}
