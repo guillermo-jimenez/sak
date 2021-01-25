@@ -105,6 +105,15 @@ def train_model(model, state: dict, execution: dict, loader: torch.utils.data.Da
     if 'best_loss' not in state:
         state['best_loss'] = np.inf
 
+    # Get savedir string
+    if "savedir" in execution:
+        str_savedir = 'savedir'
+    elif "save_directory" in execution:
+        str_savedir = 'save_directory'
+    else:
+        raise ValueError("Configuration file should include either the 'savedir' or 'save_directory' fields [case-sensitive]")
+
+    # Iterate over epochs
     for epoch in range(state['epoch'], execution['epochs']):
         try:
             # Store current epoch
@@ -115,11 +124,11 @@ def train_model(model, state: dict, execution: dict, loader: torch.utils.data.Da
             state['loss_train'] = np.mean(loss_train)
 
             # Save model/state info
-            torch.save(model, os.path.join(execution['save_directory'],'checkpoint.model'), pickle_module=dill)
-            sak.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
+            torch.save(model, os.path.join(execution[str_savedir],'checkpoint.model'), pickle_module=dill)
+            sak.pickledump(state, os.path.join(execution[str_savedir],'checkpoint.state'), mode='wb')
             
             # Log train loss
-            with open(os.path.join(execution['save_directory'],'log.csv'),'a') as f:
+            with open(os.path.join(execution[str_savedir],'log.csv'),'a') as f:
                 csvwriter = csv.writer(f)
                 csvwriter.writerow(["(Train) Epoch {:>3d}/{:>3d}, Loss {:10.3f}, Time {}".format(state['epoch']+1, execution['epochs'], state['loss_train'], time.ctime())])
 
@@ -129,15 +138,15 @@ def train_model(model, state: dict, execution: dict, loader: torch.utils.data.Da
                 state['best_epoch'] = epoch
                 
                 # Copy checkpoint and mark as best
-                shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.model'), os.path.join(execution['save_directory'],'model_best.model'))
-                shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.state'), os.path.join(execution['save_directory'],'model_best.state'))
+                shutil.copyfile(os.path.join(execution[str_savedir],'checkpoint.model'), os.path.join(execution[str_savedir],'model_best.model'))
+                shutil.copyfile(os.path.join(execution[str_savedir],'checkpoint.state'), os.path.join(execution[str_savedir],'model_best.state'))
         except KeyboardInterrupt:
-            torch.save(model, os.path.join(execution['save_directory'],'keyboard_interrupt.model'), pickle_module=dill)
-            sak.pickledump(state, os.path.join(execution['save_directory'],'keyboard_interrupt.state'), mode='wb')
+            torch.save(model, os.path.join(execution[str_savedir],'keyboard_interrupt.model'), pickle_module=dill)
+            sak.pickledump(state, os.path.join(execution[str_savedir],'keyboard_interrupt.state'), mode='wb')
             raise
         except:
-            torch.save(model, os.path.join(execution['save_directory'],'error.model'), pickle_module=dill)
-            sak.pickledump(state, os.path.join(execution['save_directory'],'error.state'), mode='wb')
+            torch.save(model, os.path.join(execution[str_savedir],'error.model'), pickle_module=dill)
+            sak.pickledump(state, os.path.join(execution[str_savedir],'error.state'), mode='wb')
             raise
 
 
@@ -154,6 +163,15 @@ def train_valid_model(model, state: dict, execution: dict,
     if 'best_loss' not in state:
         state['best_loss'] = np.inf
 
+    # Get savedir string
+    if "savedir" in execution:
+        str_savedir = 'savedir'
+    elif "save_directory" in execution:
+        str_savedir = 'save_directory'
+    else:
+        raise ValueError("Configuration file should include either the 'savedir' or 'save_directory' fields [case-sensitive]")
+
+    # Iterate over epochs
     for epoch in range(state['epoch'], execution['epochs']):
         try:
             # Store current epoch
@@ -173,11 +191,11 @@ def train_valid_model(model, state: dict, execution: dict,
                 state['scheduler'].step(state['loss_validation'])
 
             # Save model/state info
-            torch.save(model, os.path.join(execution['save_directory'],'checkpoint.model'), pickle_module=dill)
-            sak.pickledump(state, os.path.join(execution['save_directory'],'checkpoint.state'), mode='wb')
+            torch.save(model, os.path.join(execution[str_savedir],'checkpoint.model'), pickle_module=dill)
+            sak.pickledump(state, os.path.join(execution[str_savedir],'checkpoint.state'), mode='wb')
             
             # Log train/valid losses
-            with open(os.path.join(execution['save_directory'],'log.csv'),'a') as f:
+            with open(os.path.join(execution[str_savedir],'log.csv'),'a') as f:
                 csvwriter = csv.writer(f)
                 csvwriter.writerow(["(Train) Epoch {:>3d}/{:>3d}, Loss {:10.3f}, Time {}".format(state['epoch']+1, execution['epochs'], state['loss_train'], time.ctime())])
                 csvwriter.writerow(["(Valid) Epoch {:>3d}/{:>3d}, Loss {:10.3f}, Time {}".format(state['epoch']+1, execution['epochs'], state['loss_validation'], time.ctime())])
@@ -189,14 +207,14 @@ def train_valid_model(model, state: dict, execution: dict,
                 state['best_epoch'] = epoch
                 
                 # Copy checkpoint and mark as best
-                shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.model'), os.path.join(execution['save_directory'],'model_best.model'))
-                shutil.copyfile(os.path.join(execution['save_directory'],'checkpoint.state'), os.path.join(execution['save_directory'],'model_best.state'))
+                shutil.copyfile(os.path.join(execution[str_savedir],'checkpoint.model'), os.path.join(execution[str_savedir],'model_best.model'))
+                shutil.copyfile(os.path.join(execution[str_savedir],'checkpoint.state'), os.path.join(execution[str_savedir],'model_best.state'))
             
         except KeyboardInterrupt:
-            torch.save(model, os.path.join(execution['save_directory'],'keyboard_interrupt.model'), pickle_module=dill)
-            sak.pickledump(state, os.path.join(execution['save_directory'],'keyboard_interrupt.state'), mode='wb')
+            torch.save(model, os.path.join(execution[str_savedir],'keyboard_interrupt.model'), pickle_module=dill)
+            sak.pickledump(state, os.path.join(execution[str_savedir],'keyboard_interrupt.state'), mode='wb')
             raise
         except:
-            torch.save(model, os.path.join(execution['save_directory'],'error.model'), pickle_module=dill)
-            sak.pickledump(state, os.path.join(execution['save_directory'],'error.state'), mode='wb')
+            torch.save(model, os.path.join(execution[str_savedir],'error.model'), pickle_module=dill)
+            sak.pickledump(state, os.path.join(execution[str_savedir],'error.state'), mode='wb')
             raise
