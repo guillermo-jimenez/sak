@@ -106,12 +106,9 @@ def train_model(model, state: dict, execution: dict, loader: torch.utils.data.Da
         state['best_loss'] = np.inf
 
     # Get savedir string
-    if "savedir" in execution:
-        str_savedir = 'savedir'
-    elif "save_directory" in execution:
-        str_savedir = 'save_directory'
-    else:
-        raise ValueError("Configuration file should include either the 'savedir' or 'save_directory' fields [case-sensitive]")
+    if "savedir" in execution:          str_savedir = 'savedir'
+    elif "save_directory" in execution: str_savedir = 'save_directory'
+    else: raise ValueError("Configuration file should include either the 'savedir' or 'save_directory' fields [case-sensitive]")
 
     # Iterate over epochs
     for epoch in range(state['epoch'], execution['epochs']):
@@ -164,12 +161,9 @@ def train_valid_model(model, state: dict, execution: dict,
         state['best_loss'] = np.inf
 
     # Get savedir string
-    if "savedir" in execution:
-        str_savedir = 'savedir'
-    elif "save_directory" in execution:
-        str_savedir = 'save_directory'
-    else:
-        raise ValueError("Configuration file should include either the 'savedir' or 'save_directory' fields [case-sensitive]")
+    if "savedir" in execution:          str_savedir = 'savedir'
+    elif "save_directory" in execution: str_savedir = 'save_directory'
+    else: raise ValueError("Configuration file should include either the 'savedir' or 'save_directory' fields [case-sensitive]")
 
     # Iterate over epochs
     for epoch in range(state['epoch'], execution['epochs']):
