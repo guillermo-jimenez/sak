@@ -6,39 +6,37 @@ import sak
 from matplotlib.figure import Figure
 import matplotlib.colors as mcolors
 
+from sak.visualization.__ops import get_fig_kwargs
+
 
 def segmentation(
         x: np.ndarray, 
-        mask: np.ndarray, 
-        ax: Optional[Union[np.ndarray, matplotlib.axes.Axes]] = None,
-        returns: bool = False, 
-        fig: Optional[matplotlib.figure.Figure] = None,
+        y: np.ndarray, 
         **kwargs: dict
     ) -> Tuple[Figure, np.ndarray]:
 
-    # Manage inputs
-    if not isinstance(x, np.ndarray):
-        x = x.cpu().detach().numpy()
-    if not isinstance(mask, np.ndarray):
-        mask = mask.cpu().detach().numpy()
+    # Check inputs
+    if (len(x.shape) != 2) or (len(y.shape) not in [2,3]):
+        raise ValueError("Supposed to work with 2D images (grayscale)")
 
-    # Squeeze mask
-    x = x.squeeze()
-    mask = mask.squeeze()
-    if (mask.ndim == 4) or (mask.ndim == 2):
-        raise ValueError("Can only work with single-, multi-channel images in format 'CxHxW'")
+    if x.shape == y.shape:
+        y = np.copy(y)[None,]
 
-    mask_single = np.zeros((mask.shape[-2],mask.shape[-1]))
-    limits = []
-    for c in range(mask.shape[0]):
-        limits.append(c+0.5)
-        mask_single += (c+1)*mask[c]
-    limits.append(c+1.5)
-    colors = list(mcolors.cnames)[30:30+len(limits)]
+    # Get figure and axis
+    f,ax = get_fig_kwargs(**kwargs)
+
+    # Obtain mask
+    mask = y*np.arange(1,y.shape[0]+1)[:,None,None]
+    mask = mask.max(axis=0)
+
+    # Obtain grid
+    grid_X,grid_Y = np.meshgrid(np.arange(x.shape[1]),np.arange(x.shape[0]))
+    
+    # Obtain unique mask elements
+    unique_elements = np.unique(y)+0.5
+    colors = list(mcolors.cnames)[30:30+unique_elements.size]
 
     # Plot image in axis
     ax.imshow(x,cmap='gray')
-    grid_X, grid_Y = np.meshgrid(np.arange(x.shape[-1]),np.arange(x.shape[-2]))
-    ax.contourf(grid_X,grid_Y,mask_single,tuple(limits),colors=tuple(colors),alpha=0.2)
+    ax.contourf(grid_X,grid_Y,mask,unique_elements,colors=colors,alpha=0.2)
 
-    if returns: return fig,ax
