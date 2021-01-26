@@ -11,8 +11,6 @@ def get_fig_kwargs(**kwargs):
             ax = kwargs["axes"]
         elif "ax" in kwargs:
             ax = kwargs["ax"]
-        else:
-            ax = f.gca()
 
         # Solve for ax = None
         if ax is None:
