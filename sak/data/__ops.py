@@ -70,4 +70,4 @@ def split_train_valid_test(inputs: dict, valid_size: float = 1/4, test_size: flo
     assert (k_train[:,None] == k_test[None,:]).sum() == 0, msg
     assert (k_valid[:,None] == k_test[None,:]).sum() == 0, msg
     
-    return (inputs_train,inputs_valid,inputs_test)
+    return ((inputs_train,inputs_valid,inputs_test),(key_list,ix_train,ix_valid,ix_test))
