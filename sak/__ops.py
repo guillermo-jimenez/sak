@@ -8,7 +8,7 @@ import pickle
 import importlib
 
 
-def load_config(path: str) -> dict:
+def load_config(path: str, model_name: str = None) -> dict:
     # Load json
     with open(path, "r") as f:
         config = json.load(f)
@@ -28,12 +28,16 @@ def load_config(path: str) -> dict:
     if str_savedir in config:
         config[str_savedir] = os.path.expanduser(config[str_savedir])
 
-        # Split path
-        root,file = os.path.split(path)
-        fname,ext = os.path.splitext(file)
+        # Add model name to savedir
+        if model_name is None:
+            # Split path
+            root,file = os.path.split(path)
+            model_name,ext = os.path.splitext(file)
         
         # Change path to contain model name
-        config[str_savedir] = os.path.join(config[str_savedir], fname)
+        config[str_savedir] = os.path.join(config[str_savedir], model_name)
+
+        # Make dir for output files
         if not os.path.isdir(config[str_savedir]):
             pathlib.Path(config[str_savedir]).mkdir(parents=True, exist_ok=True)
 
