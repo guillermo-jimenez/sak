@@ -38,12 +38,12 @@ class SoftArgmaxAlongAxis(Module):
         # Obtain per-pixel softmax of the input tensor alongside axis
         exponential = exp(self.beta*x)
         softmax = exponential/sum(exponential, axis=self.axis).unsqueeze(self.axis)
-        
+
         # Obtain directional ramp
-        directional = ones_like(x)*linspace(0,x.shape[self.axis],x.shape[self.axis])[:,None]
+        directional = ones_like(x)*linspace(0,1,x.shape[self.axis],dtype=x.dtype)[:,None].to(x.device)
         
         # Obtain the argmax alongside axis
-        argmax = sum(softmax*directional, axis=self.axis)
+        argmax = sum(softmax*directional, axis=self.axis)*x.shape[self.axis]
         
         return argmax
 
