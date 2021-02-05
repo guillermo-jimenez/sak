@@ -12,6 +12,7 @@ from sak.visualization.__ops import get_fig_kwargs
 def segmentation(
         x: np.ndarray, 
         y: np.ndarray, 
+        color_onset: int = 30,
         **kwargs: dict
     ) -> Tuple[Figure, np.ndarray]:
 
@@ -34,7 +35,7 @@ def segmentation(
     
     # Obtain unique mask elements
     unique_elements = np.unique(y)+0.5
-    colors = list(mcolors.cnames)[30:30+unique_elements.size]
+    colors = list(mcolors.cnames)[color_onset:color_onset+unique_elements.size]
 
     # Plot image in axis
     ax.imshow(x,cmap='gray')
