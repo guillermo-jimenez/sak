@@ -105,36 +105,64 @@ def maxima(X: np.ndarray, sampfrom: int = 0, sampto: int = None) -> List[np.ndar
     """Returns relative maxima of array"""
     # X = ordering_N_lead(X)
     X = X[sampfrom:sampto,]
-    return [sampfrom + np.where(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T < -1)[0] for j in range(X.shape[1])]
+    if X.ndim == 1:
+        return sampfrom + np.where(np.diff(np.sign(np.diff(X)),prepend=0,append=0).T < -1)[0]
+    elif X.ndim == 2:
+        return [sampfrom + np.where(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T < -1)[0] for j in range(X.shape[1])]
+    else:
+        raise NotImplementedError("maxima function not implemented for arrays larger than 2D")
 
 def minima(X: np.ndarray, sampfrom: int = 0, sampto: int = None) -> List[np.ndarray]:
     """Returns relative minima of array"""
     # X = ordering_N_lead(X)
     X = X[sampfrom:sampto,]
-    return [sampfrom + np.where(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T > 1)[0] for j in range(X.shape[1])]
+    if X.ndim == 1:
+        return sampfrom + np.where(np.diff(np.sign(np.diff(X)),prepend=0,append=0).T > 1)[0]
+    elif X.ndim == 2:
+        return [sampfrom + np.where(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T > 1)[0] for j in range(X.shape[1])]
+    else:
+        raise NotImplementedError("minima function not implemented for arrays larger than 2D")
 
 def extrema(X: np.ndarray, sampfrom: int = 0, sampto: int = None) -> List[np.ndarray]:
     """Returns relative minima of array"""
     # X = ordering_N_lead(X)
     X = X[sampfrom:sampto,]
-    return [sampfrom + np.where(np.abs(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T) > 1)[0] for j in range(X.shape[1])]
+    if X.ndim == 1:
+        return sampfrom + np.where(np.abs(np.diff(np.sign(np.diff(X)),prepend=0,append=0).T) > 1)[0]
+    elif X.ndim == 2:
+        return [sampfrom + np.where(np.abs(np.diff(np.sign(np.diff(X[:,j])),prepend=0,append=0).T) > 1)[0] for j in range(X.shape[1])]
+    else:
+        raise NotImplementedError("extrema function not implemented for arrays larger than 2D")
 
 def zero_crossings(X: np.ndarray, axis: int = None) -> List[np.ndarray]:
     """Returns zero crossings of array"""
-    if X.ndim == 1:
-        X = X[:,None]
     # X = ordering_N_lead(X)
-    return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])))[0] for j in range(X.shape[1])]
+    if X.ndim == 1:
+        return np.where(np.diff(np.sign(X),prepend=np.sign(X[0])))[0]
+    elif X.ndim == 2:
+        return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])))[0] for j in range(X.shape[1])]
+    else:
+        raise NotImplementedError("zero_crossings function not implemented for arrays larger than 2D")
 
 def positive_zero_crossings(X: np.ndarray) -> List[np.ndarray]:
     """Returns zero crossings of array"""
     # X = ordering_N_lead(X)
-    return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])) < 0)[0] for j in range(X.shape[1])]
+    if X.ndim == 1:
+        return np.where(np.diff(np.sign(X),prepend=np.sign(X[0])) < 0)[0]
+    elif X.ndim == 2:
+        return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])) < 0)[0] for j in range(X.shape[1])]
+    else:
+        raise NotImplementedError("positive_zero_crossings function not implemented for arrays larger than 2D")
 
 def negative_zero_crossings(X: np.ndarray) -> List[np.ndarray]:
     """Returns zero crossings of array"""
     # X = ordering_N_lead(X)
-    return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])) > 0)[0] for j in range(X.shape[1])]
+    if X.ndim == 1:
+        return np.where(np.diff(np.sign(X),prepend=np.sign(X[0])) > 0)[0]
+    elif X.ndim == 2:
+        return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])) > 0)[0] for j in range(X.shape[1])]
+    else:
+        raise NotImplementedError("negative_zero_crossings function not implemented for arrays larger than 2D")
 
 def xcorr(x: np.ndarray, y: np.ndarray = None, normed: bool = True, maxlags: int = None) -> List[np.ndarray]:
     # Cross correlation of two signals of equal length
