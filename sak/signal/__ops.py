@@ -35,8 +35,11 @@ def get_mask_boundary(binary_mask: np.ndarray, axis=-1, aslist=True) -> Tuple[li
     return onsets, offsets
 
 def flatten_along_axis(X: np.ndarray, axis: int = None):
+    X = np.copy(X)
     if axis != None:
-        X = X.reshape((X.shape[axis], np.prod(np.delete(X.shape,axis))))
+        for i in reversed(range(axis)):
+            X = np.swapaxes(X,i,i+1)
+        X = X.reshape((X.shape[0], X.size//X.shape[0]))
     else:
         X = X.flatten()[np.newaxis,:]
     return X
