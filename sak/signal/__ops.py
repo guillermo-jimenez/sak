@@ -4,8 +4,9 @@ from skimage.util import view_as_windows
 
 StandardHeader = np.array(['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'])
 
-def moving_lambda(x: Iterable, stride: int, lmbda: Callable) -> List[Iterable]:
-    return [lmbda(x[i:i+stride]) for i in range(0,len(x),stride)]
+def moving_lambda(x: Iterable, stride: int, lmbda: Callable, axis: int = 0) -> List[Iterable]:
+    x = np.swapaxes(np.copy(x),0,axis)
+    return np.swapaxes([lmbda(x[i:i+stride]) for i in range(0,len(x),stride)],0,axis)
 
 def sigmoid(x: float or Iterable) -> float or np.ndarray:
     return 1/(1 + np.exp(-x))
@@ -44,15 +45,46 @@ def flatten_along_axis(X: np.ndarray, axis: int = None):
         X = X.flatten()[np.newaxis,:]
     return X
 
-def amplitude(X: np.ndarray, axis: Tuple = None) -> np.ndarray:
-    return np.max(X,axis=axis) - np.min(X,axis=axis)
+def unflatten_along_axis(X: np.ndarray, shape: Tuple[int], axis: int):
+    """Unpacks an array with the same order of operations as 'flatten_along_axis'. 
+    Only to be used with that function"""
+    X = np.copy(X)
+    shape = np.copy(shape).tolist()
     
-def abs_max(X: np.ndarray, axis: Tuple = None) -> np.ndarray:
-    return np.max(np.abs(X),axis=axis)
+    # Assert shapes are compatible
+    assert X.size == np.prod(shape), "The shapes do not coincide"
     
-def min_max_ratio(X: np.ndarray, axis: Tuple = None) -> np.ndarray:
-    maximum = np.max(X,axis=axis)
-    minimum = np.min(X,axis=axis)
+    # Check position of dimension 0 of flattened array
+    for i in reversed(range(axis)):
+        # Swap values in shape vector
+        val_curr = shape[i]
+        val_next = shape[i+1]
+
+        shape[i] = val_next
+        shape[i+1] = val_curr
+        
+    # Reshape array
+    X = X.reshape(shape)
+    
+    # Swap axes to original shape
+    for i in range(axis):
+        X = np.swapaxes(X,i,i+1)
+    return X
+
+def moving_average(x, w=5, **kwargs):
+    x = np.copy(x)
+    x = np.pad(x,(w//2, w//2), **kwargs)
+    return np.convolve(x, np.ones(w), 'valid') / w
+
+def amplitude(X: np.ndarray, **kwargs) -> np.ndarray:
+    return np.max(X,**kwargs) - np.min(X,**kwargs)
+    
+def abs_max(X: np.ndarray, **kwargs) -> np.ndarray:
+    return np.max(np.abs(X),**kwargs)
+    
+def min_max_ratio(X: np.ndarray, **kwargs) -> np.ndarray:
+    maximum = np.max(X, **kwargs)
+    minimum = np.min(X, **kwargs)
     return 1-np.min([np.abs(maximum),np.abs(minimum)])/np.max([np.abs(maximum),np.abs(minimum)])
     
 def on_off_correction(X: np.ndarray) -> np.ndarray:

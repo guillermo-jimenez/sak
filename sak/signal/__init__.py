@@ -1,5 +1,6 @@
 import sak.signal.interpolate
 from .__ops import flatten_along_axis
+from .__ops import unflatten_along_axis
 from .__ops import on_off_correction
 from .__ops import get_mask_boundary
 from .__ops import abs_max_is_positive
@@ -14,6 +15,7 @@ from .__ops import positive_zero_crossings
 from .__ops import negative_zero_crossings
 from .__ops import min_max_ratio
 from .__ops import moving_lambda
+from .__ops import moving_average
 from .__ops import amplitude
 from .__ops import abs_max
 from .__ops import maxima
