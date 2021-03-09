@@ -139,7 +139,7 @@ def compute_crossings(X: np.ndarray, Wavelet: np.ndarray) -> List[np.ndarray]:
         raise ValueError("Function supposed to work with wavelets of all leads for a single scale")
 
     # Compute zero crossings
-    crossings = [np.concatenate(([0],zero_crossings(Wavelet[:,lead])[0],[Wavelet.shape[0]-1])) for lead in range(Wavelet.shape[1])]
+    crossings = [np.concatenate(([0],zero_crossings(Wavelet[:,lead]),[Wavelet.shape[0]-1])) for lead in range(Wavelet.shape[1])]
     
     # Compute areas for these zero crossings
     areas = [np.array([np.trapz(Wavelet[crossings[lead][c]:crossings[lead][c+1],lead]) for c in range(len(crossings[lead])-1)]) for lead in range(Wavelet.shape[1])]
