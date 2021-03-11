@@ -2,6 +2,7 @@ from typing import Any, List, Tuple
 import numpy as np
 from scipy.signal import lfilter
 from sak.signal.interpolate import interp
+from sak.signal.interpolate import interp1d
 from sak.signal import zero_crossings
 
 def wav5t(X: np.ndarray, q1: list, q2: list, q3: list, q4: list, q5: list, mode: str = 'edge') -> np.ndarray:
@@ -241,3 +242,25 @@ def compute_waves(W: np.ndarray, crossings: np.ndarray or list, normalize: bool 
         waves = waves/np.max(np.abs(waves))
 
     return waves
+
+
+def find_peaks(x: np.ndarray, fs: float = 1000., scale: [1,5] = 5, upscale: int = 5):
+    if (scale < 1) or (scale > 5):
+        raise ValueError("Scale parameter must be valued in the range [1,5]")
+    if x.ndim > 1:
+        raise NotImplementedError("Will do in the future")
+    x = interp1d(np.copy(x).astype(float),x.size*upscale)
+    
+    # Obtain wavelet transform of upsampled envelope
+    wavelet = transform(x, fs)
+    
+    # Return wavelet transform to original sampling frequency
+    wavelet = interp1d(wavelet,x.size//upscale,axis=0)
+
+    # Isolate nth scale
+    wavelet_scale = wavelet[:,0,scale-1]
+
+    # Compute crossings, maxima, minima
+    crossings = zero_crossings(wavelet_scale)
+    
+    return crossings
