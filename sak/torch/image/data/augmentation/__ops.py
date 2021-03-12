@@ -3,7 +3,6 @@ from typing import Union, Tuple, List, Iterable, Callable, Any
 import cv2
 import math
 import torch
-import numpy
 import random
 import sak.data
 import sak.signal
@@ -420,4 +419,4 @@ class PrintCursors(object):
                     for i,loc in enumerate(range(ruler_onset,H,ruler_spacing)):
                         x[b,c,loc-1:loc+1,-int(ruler_width*(1.5**(i%random.choice([5,10,20])==0))):] = value
         
-        return x
+        return torch.tensor(x)
