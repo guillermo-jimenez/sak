@@ -382,7 +382,10 @@ class PrintCursors(object):
                     crossings = sak.signal.find_peaks(y_1d[b,c],fs=self.fs,scale=self.scale,upscale=self.upscaling_factor)
                     locations = list(zip(crossings,y_1d[b,c,crossings].astype(int)))
                 else:
-                    locations = [(random.randint(0,W),random.randint(0,H)) for _ in range(10)]
+                    locations = [(random.randint(0,W),random.randint(0,H)) for _ in range(15)]
+                if len(locations) == 0:
+                    locations = [(random.randint(0,W),random.randint(0,H)) for _ in range(15)]
+
                 unique_x = np.unique([loc[0] for loc in locations]).tolist()
                 unique_y = np.unique([loc[1] for loc in locations]).tolist()
 
