@@ -1,5 +1,9 @@
 from torch import Tensor
+from torch import exp
+from torch import ones_like
+from torch import log
 from torch.nn import Module
+from torch.nn import Parameter
 from torch.nn import Identity
 from torch.nn import BatchNorm1d
 from torch.nn import BatchNorm2d
@@ -18,6 +22,8 @@ from torch.nn import AdaptiveAvgPool3d
 from torch.nn import Linear
 from torch.nn import Sigmoid
 from torch.nn import ReLU
+
+from torch.nn import init
 
 from torch.nn.functional import interpolate
 from .composers import Sequential
@@ -512,3 +518,146 @@ class PointwiseAttention3d(PointwiseAttentionNd):
     def __init__(self, channels: int = required, reduction_factor: int = required, **kwargs: dict):
         super(PointwiseAttention3d, self).__init__(channels, reduction_factor, dim = 3, **kwargs)
 
+
+class RBF(Module):
+    """
+    Transforms incoming data using a given radial basis function:
+    u_{i} = rbf(||x - c_{i}|| / s_{i})
+    Arguments:
+        in_features: size of each input sample
+        out_features: size of each output sample
+    Shape:
+        - Input: (N, in_features) where N is an arbitrary batch size
+        - Output: (N, out_features) where N is an arbitrary batch size
+    Attributes:
+        centres: the learnable centres of shape (out_features, in_features).
+            The values are initialised from a standard normal distribution.
+            Normalising inputs to have mean 0 and standard deviation 1 is
+            recommended.
+        
+        sigmas: the learnable scaling factors of shape (out_features).
+            The values are initialised as ones.
+        
+        basis_func: the radial basis function used to transform the scaled
+            distances.
+    """
+
+    def __init__(self, in_features: int = required, out_features: int = required, basis_function: str = "gaussian", **kwargs):
+        super(RBF, self).__init__()
+        self.in_features = in_features
+        self.out_features = out_features
+        self.centres = Parameter(Tensor(out_features, in_features))
+        self.sigmas = Parameter(Tensor(out_features))
+        self.basis_func = self.__basis_func_dict(basis_function)
+        self.init_centres = class_selector(kwargs.get("initializer","torch.nn.init.normal_"))
+        self.init_sigmas  = class_selector(kwargs.get("initializer","torch.nn.init.constant_"))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        self.init_centres(self.centres, 0, 1)
+        self.init_sigmas(self.sigmas, 1)
+
+    def forward(self, input):
+        size = (input.size(0), self.out_features, self.in_features)
+        x = input.unsqueeze(1).expand(size)
+        c = self.centres.unsqueeze(0).expand(size)
+        distances = (x - c).pow(2).sum(-1).pow(0.5) * self.sigmas.unsqueeze(0)
+        return self.basis_func(distances)
+
+    # RBFs
+    def __gaussian(self, alpha):
+        phi = exp(-1*alpha.pow(2))
+        return phi
+
+    def __linear(self, alpha):
+        phi = alpha
+        return phi
+
+    def __quadratic(self, alpha):
+        phi = alpha.pow(2)
+        return phi
+
+    def __inverse_quadratic(self, alpha):
+        phi = ones_like(alpha) / (ones_like(alpha) + alpha.pow(2))
+        return phi
+
+    def __multiquadric(self, alpha):
+        phi = (ones_like(alpha) + alpha.pow(2)).pow(0.5)
+        return phi
+
+    def __inverse_multiquadric(self, alpha):
+        phi = ones_like(alpha) / (ones_like(alpha) + alpha.pow(2)).pow(0.5)
+        return phi
+
+    def __spline(self, alpha):
+        phi = (alpha.pow(2) * log(alpha + ones_like(alpha)))
+        return phi
+
+    def __poisson_one(self, alpha):
+        phi = (alpha - ones_like(alpha)) * exp(-alpha)
+        return phi
+
+    def __poisson_two(self, alpha):
+        phi = ((alpha - 2*ones_like(alpha)) / 2*ones_like(alpha)) \
+        * alpha * exp(-alpha)
+        return phi
+
+    def __matern32(self, alpha):
+        phi = (ones_like(alpha) + 3**0.5*alpha)*exp(-3**0.5*alpha)
+        return phi
+
+    def __matern52(self, alpha):
+        phi = (ones_like(alpha) + 5**0.5*alpha + (5/3) \
+        * alpha.pow(2))*exp(-5**0.5*alpha)
+        return phi
+
+    def __basis_func_dict(self, basis):
+        """
+        A helper function that returns a dictionary containing each RBF
+        """
+
+        bases = {'gaussian': self.__gaussian,
+                 'linear': self.__linear,
+                 'quadratic': self.__quadratic,
+                 'inverse_quadratic': self.__inverse_quadratic,
+                 'multiquadric': self.__multiquadric,
+                 'inverse_multiquadric': self.__inverse_multiquadric,
+                 'spline': self.__spline,
+                 'poisson_one': self.__poisson_one,
+                 'poisson_two': self.__poisson_two,
+                 'matern32': self.__matern32,
+                 'matern52': self.__matern52}
+
+        basis = bases.get(basis.lower(),None)
+
+        if basis is None:
+            raise ValueError("""
+                Basis function must be in ['gaussian', 'linear', 'quadratic', 
+                'inverse_quadratic', 'multiquadric', 'inverse_multiquadric', 
+                'spline', 'poisson_one', 'poisson_two', 'matern32', 'matern52']
+            """)
+
+        return basis
+
+
+class SVM(Module):
+    def __init__(self, in_features: int = required, out_features: int = required, bias: bool = True, basis_function: str = "gaussian"):
+        super(SVM, self).__init__()
+        # Check required inputs
+        check_required(self, {"in_features": in_features, "out_features": out_features})
+
+        # Store inputs
+        self.in_features = in_features
+        self.out_features = out_features
+        self.bias = bias
+        self.basis_function = basis_function
+
+        # Declare RBF and Linear functions
+        self.rbf = RBF(self.in_features, self.out_features, self.basis_function)
+        self.linear = Linear(self.out_features, self.out_features, self.bias)
+
+    def forward(self, x):
+        out = self.rbf(x)
+        out = self.linear(out)
+
+        return out

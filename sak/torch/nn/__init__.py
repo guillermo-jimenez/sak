@@ -12,6 +12,7 @@ from .modules.modules import ImagePooling1d,                  ImagePooling2d,   
                              PointwiseSqueezeAndExcitation1d, PointwiseSqueezeAndExcitation2d, PointwiseSqueezeAndExcitation3d, \
                              EfficientChannelAttention1d,     EfficientChannelAttention2d,     EfficientChannelAttention3d, \
                              AdaptiveAvgPoolAttention1d,      AdaptiveAvgPoolAttention2d,      AdaptiveAvgPoolAttention3d, \
-                             PointwiseAttention1d,            PointwiseAttention2d,            PointwiseAttention3d
+                             PointwiseAttention1d,            PointwiseAttention2d,            PointwiseAttention3d, \
+                             RBF,                             SVM
 from .modules.composers import ModelGraph, Sequential, Parallel
 from .modules.utils import SoftArgmaxAlongAxis, Lambda, Concatenate, ViewAsWindows, ViewDimensionAsWindows, OperationIterator, Regularization, Reparameterize, none, Add, Multiply, Squeeze, Unsqueeze, View, UnFlatten, Dropout1d
