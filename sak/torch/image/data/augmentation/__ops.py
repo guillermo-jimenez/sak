@@ -3,7 +3,6 @@ from typing import Union, Tuple, List, Iterable, Callable, Any
 import cv2
 import math
 import torch
-import numpy
 import random
 import sak.data
 import sak.signal
@@ -331,3 +330,96 @@ class SkimageLambda(object):
 
         return out
 
+class PrintCursors(object):
+    def __init__(self, proba_crosshairs = 0.5, proba_horizontal_lines = 0.5, proba_vertical_lines = 0.5, 
+                       proba_ruler_x = 0.05, proba_ruler_y = 0.5, scale = 5, upscaling_factor = 10, fs = 1000.):
+        self.proba_crosshairs = proba_crosshairs
+        self.proba_horizontal_lines = proba_horizontal_lines
+        self.proba_vertical_lines = proba_vertical_lines
+        self.proba_ruler_x = proba_ruler_x
+        self.proba_ruler_y = proba_ruler_y
+        self.scale = scale
+        self.upscaling_factor = upscaling_factor
+        self.fs = fs
+
+    def __call__(self, x: torch.Tensor, y_1d: torch.Tensor = None):
+        # Probabilities & other parameters
+        has_crosshair    = random.uniform(0,1) > (1-self.proba_crosshairs)
+        has_horizlines   = random.uniform(0,1) > (1-self.proba_horizontal_lines)
+        has_vertlines    = random.uniform(0,1) > (1-self.proba_vertical_lines)
+        has_ruler_x      = random.uniform(0,1) > (1-self.proba_ruler_x)
+        has_ruler_y      = random.uniform(0,1) > (1-self.proba_ruler_y)
+        N_horiz = np.random.choice([1,2],       p=[0.45,0.55,])*has_horizlines
+        N_vert  = np.random.choice([1,2,3,4,5], p=[0.15,0.58,0.25,0.01,0.01,])*has_vertlines
+        N_cross = np.random.choice([1,2,3,4],   p=[0.6,0.38,0.01,0.01])*has_crosshair
+        ruler_spacing     = random.randint(10,50)
+        ruler_width       = random.randint(10,20)
+        ruler_onset       = random.randint(0,ruler_spacing)
+        crosshair_length  = random.randint(15,25)
+        crosshair_width   = np.random.choice([1,2],p=[0.2,0.8])
+        vertline_width    = np.random.choice([1,2],p=[0.8,0.2])
+        horizline_spacing = random.randint(5,10)
+
+        # Avoid modifying inputs forever
+        x = x.numpy().copy()
+        y_1d = y_1d.numpy().copy() if (y_1d is not None) else None
+        
+        # Avoid issues with max values
+        if x.max() <= 1:
+            value = 1
+        elif x.max() <= 255:
+            value = 255
+        else:
+            raise NotImplementedError("Value not implemented yet")
+
+        # Get dimensions
+        BS,CH,H,W = x.shape
+
+        for b in range(BS):
+            for c in range(CH):
+                # To be generated
+                if y_1d is not None:
+                    crossings = sak.signal.find_peaks(y_1d[b,c],fs=self.fs,scale=self.scale,upscale=self.upscaling_factor)
+                    locations = list(zip(crossings,y_1d[b,c,crossings].astype(int)))
+                else:
+                    locations = [(random.randint(0,W),random.randint(0,H)) for _ in range(15)]
+                if len(locations) == 0:
+                    locations = [(random.randint(0,W),random.randint(0,H)) for _ in range(15)]
+
+                unique_x = np.unique([loc[0] for loc in locations]).tolist()
+                unique_y = np.unique([loc[1] for loc in locations]).tolist()
+
+                for _ in range(N_cross):
+                    loc_x,loc_y = random.choice(locations)
+                    loc_x = int(loc_x + random.normalvariate(0,1)*10)
+                    loc_y = int(loc_y + random.normalvariate(0,1)*10)
+
+                    n = random.randint(1,5)
+                    x_space = x[b,c,loc_y-crosshair_width-n:loc_y+crosshair_width+n,
+                                loc_x-crosshair_width-n:loc_x+crosshair_width+n].copy()
+                    x[b,c,loc_y-crosshair_width:loc_y+crosshair_width,
+                      loc_x-crosshair_length:loc_x+crosshair_length,] = value
+                    x[b,c,loc_y-crosshair_length:loc_y+crosshair_length,
+                      loc_x-crosshair_width:loc_x+crosshair_width,] = value
+
+                    if random.uniform(0,1) > (1-0.5):
+                        x[b,c,loc_y-crosshair_width-n:loc_y+crosshair_width+n,
+                          loc_x-crosshair_width-n:loc_x+crosshair_width+n] = x_space
+
+                for _ in range(N_vert):
+                    loc_x = random.choice(unique_x) + random.randint(-5,5)
+                    x[b,c,:,loc_x-vertline_width:loc_x+vertline_width] = value
+
+                for _ in range(N_horiz):
+                    loc_y = random.choice(unique_y) + random.randint(-5,5)
+                    dashes = sak.signal.pulse_train(W,horizline_spacing,random.randint(0,horizline_spacing)).astype(bool)
+                    x[b,c,loc_y-1:loc_y+1,dashes] = value
+
+                if has_ruler_x:
+                    for i,loc in enumerate(range(ruler_onset,W,ruler_spacing)):
+                        x[b,c,-int(ruler_width*(1.5**(i%random.choice([5,10,20])==0))):,loc-1:loc+1] = value
+                if has_ruler_x or has_ruler_y:
+                    for i,loc in enumerate(range(ruler_onset,H,ruler_spacing)):
+                        x[b,c,loc-1:loc+1,-int(ruler_width*(1.5**(i%random.choice([5,10,20])==0))):] = value
+        
+        return torch.tensor(x)
