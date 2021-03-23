@@ -548,7 +548,7 @@ class RBF(Module):
         self.out_features = out_features
         self.centres = Parameter(Tensor(out_features, in_features))
         self.sigmas = Parameter(Tensor(out_features))
-        self.basis_func = self.__basis_func_dict(basis_function)
+        self.basis_function = self.__basis_func_dict(basis_function)
         self.init_centres = class_selector(kwargs.get("initializer","torch.nn.init.normal_"))
         self.init_sigmas  = class_selector(kwargs.get("initializer","torch.nn.init.constant_"))
         self.reset_parameters()
@@ -562,7 +562,7 @@ class RBF(Module):
         x = input.unsqueeze(1).expand(size)
         c = self.centres.unsqueeze(0).expand(size)
         distances = (x - c).pow(2).sum(-1).pow(0.5) * self.sigmas.unsqueeze(0)
-        return self.basis_func(distances)
+        return self.basis_function(distances)
 
     # RBFs
     def __gaussian(self, alpha):
