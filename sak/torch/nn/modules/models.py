@@ -1,13 +1,18 @@
 from typing import Any, List, Tuple, Union, Dict
 from torch import Tensor
 from torch.nn import Module
+from torch.nn import Identity
+from .composers import Parallel
 from .composers import Sequential
 from .utils import Regularization
 from sak import class_selector
 from sak.__ops import required
 from sak.__ops import check_required
+from sak.__ops import from_dict
+from sak.__ops import class_selector
 from functools import reduce
 from sak.torch.nn.modules.utils import Concatenate
+from sak.__ops import reversed_enumerate
 
 
 def update_regularization(regularization_list: list = required, network_params: dict = required, preoperation=False):
@@ -147,6 +152,121 @@ class DNN(Module):
             
         # Create sequential model
         self.operations = Sequential(*self.operations)
+    
+    def forward(self, x: Tensor) -> Any:
+        return self.operations(x)
+
+
+class UNet(Module):
+    def __init__(self, 
+                 in_channels: int = required,
+                 out_channels: int = required,
+                 unet_channels: int = required,
+                 levels: int = required,
+                 repetitions: int = required,
+                 operation: dict = {"class" : "torch.nn.Conv1d"},
+                 downsampling_operation: dict = {"class": "torch.nn.AvgPool1d", "arguments": {"kernel_size": 2}},
+                 upsampling_operation: dict = {"class": "torch.nn.Upsample", "arguments": {"scale_factor": 2}},
+                 merging_operation: dict = {"class": "sak.torch.nn.Concatenate"},
+                 regularization: list = None,
+                 regularize_extrema: bool = True,
+                 preoperation: bool = False,
+                 **kwargs):
+        super(UNet, self).__init__()
+        
+        # Store inputs
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.unet_channels = unet_channels
+        self.levels = levels
+        self.repetitions = repetitions
+        self.operation = operation
+        self.downsampling_operation = downsampling_operation
+        self.upsampling_operation = upsampling_operation
+        self.merging_operation = merging_operation
+        self.regularization = regularization
+        self.regularize_extrema = regularize_extrema
+        self.preoperation = preoperation
+        
+        # Infer scaling factor
+        if   ("Upsample" in self.upsampling_operation["class"]) and ("scale_factor" in self.upsampling_operation.get("arguments")): 
+            self.scale_factor = self.upsampling_operation["arguments"]["scale_factor"]
+        elif ("AvgPool1d" in self.downsampling_operation["class"]) and ("kernel_size" in self.upsampling_operation.get("arguments")): 
+            self.scale_factor = self.downsampling_operation["arguments"]["kernel_size"]
+        elif ("AvgPool1d" in self.upsampling_operation["class"]) and ("kernel_size" in self.upsampling_operation.get("arguments")): 
+            self.scale_factor = 1/self.upsampling_operation["arguments"]["kernel_size"]
+        elif ("Upsample" in self.downsampling_operation["class"]) and ("scale_factor" in self.upsampling_operation.get("arguments")): 
+            self.scale_factor = 1/self.downsampling_operation["arguments"]["scale_factor"]
+            
+        # Convolutional operation
+        op = {
+            "class": "sak.torch.nn.CNN",
+            "arguments": {
+                "operation": self.operation,
+                "channels": [0]*self.repetitions,
+                "regularization": self.regularization,
+                "regularize_extrema": False,
+                "preoperation": self.preoperation
+            }
+        }
+
+        self.operations = []
+        for i,level in enumerate(reversed(range(levels))):
+            # Downsampling operation
+            down_op = from_dict(self.downsampling_operation) if level != 0 else Identity()
+            merg_op = from_dict(self.merging_operation)
+            up_op   = from_dict(self.upsampling_operation) if level != 0 else Identity()
+            
+            # Define ENCODER channels operation
+            encoder_op["arguments"]["channels"]     = [self.unet_channels*(self.scale_factor**level)]*self.repetitions
+            encoder_op["arguments"]["channels"][0]  = self.in_channels if (level == 0) else int(encoder_op["arguments"]["channels"][0]/self.scale_factor)
+            encoder_op["arguments"]["regularize_extrema"] = self.regularize_extrema if ((self.preoperation) or (not self.preoperation and (i != 0))) else False
+            encoder_op = class_selector(encoder_op["class"])(**encoder_op["arguments"])
+
+            # Define DECODER channels operation
+            decoder_op["arguments"]["channels"]     = [self.unet_channels*(self.scale_factor**level)]*self.repetitions
+            decoder_op["arguments"]["channels"][0]  = int(decoder_op["arguments"]["channels"][0] + decoder_op["arguments"]["channels"][0]*self.scale_factor)
+            decoder_op["arguments"]["channels"][-1] = self.out_channels if (level == 0) else decoder_op["arguments"]["channels"][-1]
+            decoder_op["arguments"]["regularize_extrema"] = self.regularize_extrema if ((not self.preoperation) or (self.preoperation and (i != 0))) else False
+            decoder_op = class_selector(decoder_op["class"])(**decoder_op["arguments"]) if level == levels-1 else Identity()
+
+            # Parallelize and sequentialize level
+            if i == 0:
+                level = Sequential(
+                    down_op,
+                    encoder_op,
+                    up_op
+                )
+            elif i == levels-1:
+                level = Sequential(
+                    encoder_op,
+                    Parallel(
+                        Identity(),
+                        self.operations
+                    ),
+                    Concatenate(),
+                    decoder_op
+                )
+            else:
+                level = Sequential(
+                    down_op,
+                    encoder_op,
+                    Parallel(
+                        Identity(),
+                        self.operations
+                    ),
+                    Concatenate(),
+                    decoder_op,
+                    up_op
+                )
+            
+            # Add operation to pile
+            self.operations = level
+
+        # Create sequential model
+        self.operations = level
+
+
     
     def forward(self, x: Tensor) -> Any:
         return self.operations(x)
