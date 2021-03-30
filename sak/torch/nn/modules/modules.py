@@ -26,6 +26,7 @@ from torch.nn import ReLU
 from torch.nn import init
 
 from torch.nn.functional import interpolate
+from sak.torch.nn.modules.utils import Concatenate
 from .composers import Sequential
 from .composers import Parallel
 from sak import class_selector
@@ -661,3 +662,28 @@ class SVM(Module):
         out = self.linear(out)
 
         return out
+
+
+class CrossResidualFusionBlock(Module):
+    """From KiU-Net: Overcomplete Convolutional Architectures for Biomedical Image and Volumetric Segmentation 
+    https://arxiv.org/pdf/2010.01663.pdf"""
+    def __init__(self, scale_factor: (float or Tuple[float]) = required,
+                       mode_interpolation: ["nearest" or "linear" or "bilinear" or "bicubic" or "trilinear" or "area"] = "bilinear", 
+                       mode_merging: ["add", "multiply", "concatenate"] = "concatenate",
+                       **kwargs: dict):
+        super(CrossResidualFusionBlock, self).__init__()
+        
+        # Check required inputs
+        check_required(self, {"scale_factor": scale_factor})
+
+        # Store inputs
+        self.scale_factor = scale_factor
+        self.mode_interpolation = mode_interpolation
+        self.mode_merging = mode_merging
+        if   self.mode_merging.lower() == "add":         self.merger = lambda *args: reduce((lambda x, y: x + y), args)
+        elif self.mode_merging.lower() == "multiply":    self.merger = lambda *args: reduce((lambda x, y: x * y), args)
+        elif self.mode_merging.lower() == "concatenate": self.merger = Concatenate()
+
+    def forward(self, source: Tensor, destination: Tensor) -> Tensor:
+        return self.merger(destination,interpolate(source,scale_factor=self.scale_factor,mode=self.mode_interpolation))
+
