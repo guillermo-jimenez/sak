@@ -208,4 +208,12 @@ def check_required(obj, dic: dict):
         if value is required:
             raise ValueError("Class {} instantiated without required parameter {}".format(obj.__class__, param))
 
+def reversed_enumerate(sequence, start=None):
+    n = start
+    if start is None:
+        start = len(sequence) - 1
+    for elem in sequence[::-1]:
+        yield n, elem
+        n -= 1    
+
 required = _RequiredParameter()

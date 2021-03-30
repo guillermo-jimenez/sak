@@ -11,6 +11,7 @@ from .__ops import load_data
 from .__ops import load_config
 from .__ops import save_data
 from .__ops import argsort_as
+from .__ops import reversed_enumerate
 
 import sak.image
 import sak.signal
