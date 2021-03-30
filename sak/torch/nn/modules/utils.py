@@ -374,3 +374,22 @@ class UnFlatten(Module):
         return x.view(x.shape[0], *self.shape)
 
 
+class Interpolate(Module):
+    def __init__(self, 
+            size: (int or Tuple[int] or Tuple[int, int] or Tuple[int, int, int]) = None, 
+            scale_factor: (float or Tuple[float]) = None, 
+            mode: ['nearest' or 'linear' or 'bilinear' or 'bicubic' or 'trilinear' or 'area'] = 'nearest', 
+            align_corners: bool = None, 
+            recompute_scale_factor: bool = None
+        ):
+        super(Interpolate, self).__init__()
+
+        size = size
+        scale_factor = scale_factor
+        mode = mode
+        align_corners = align_corners
+        recompute_scale_factor = recompute_scale_factor
+
+    def forward(self, input):
+        return interpolate(input, self.size, self.scale_factor, self.mode, self.align_corners, self.recompute_scale_factor)
+
