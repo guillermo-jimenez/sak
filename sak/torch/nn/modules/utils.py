@@ -86,6 +86,16 @@ class Concatenate(Module):
         return cat(x_list, dim=self.dim)
         
 
+class PrintShapes(Module):
+    def __init__(self, *args, **kwargs):
+        super(PrintShapes, self).__init__()
+        pass
+
+    def forward(self, *x_list: List[Tensor]) -> Tensor:
+        for x in x_list:
+            print(x.shape)
+        print("")
+
 class OperationIterator(Module):
     def __init__(self, operation: dict = required, iterator: dict = required):
         super(OperationIterator, self).__init__()
