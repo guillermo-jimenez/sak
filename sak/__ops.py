@@ -1,4 +1,4 @@
-from typing import Any, Tuple, List
+from typing import Any, Tuple, List, Iterable
 import pandas as pd
 import numpy as np
 import os
@@ -23,7 +23,11 @@ def load_config(path: str, model_name: str = None) -> dict:
         config["basedir"] = os.path.expanduser(config["basedir"])
 
     if "datadir" in config:
-        config["datadir"] = os.path.expanduser(config["datadir"])
+        if isinstance(config["datadir"], str):
+            config["datadir"] = os.path.expanduser(config["datadir"])
+        elif isinstance(config["datadir"], (list, tuple)):
+            for i in range(len(config["datadir"])):
+                config["datadir"][i] = os.path.expanduser(config["datadir"][i])
 
     if str_savedir in config:
         config[str_savedir] = os.path.expanduser(config[str_savedir])
