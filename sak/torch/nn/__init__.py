@@ -18,7 +18,8 @@ from .modules.modules import ImagePooling1d,                    ImagePooling2d, 
                              AdaptiveAvgPoolAttention1d,        AdaptiveAvgPoolAttention2d,         AdaptiveAvgPoolAttention3d, \
                              PointwiseAttention1d,              PointwiseAttention2d,               PointwiseAttention3d, \
                              RBF,                               SVM,                                CrossResidualFusionBlock
-from .modules.composers import ModelGraph,                      Sequential,                         Parallel
+from .modules.composers import ModelGraph,                      Sequential,                         Parallel, \
+                               ModelWrapper
 from .modules.utils import  SoftArgmaxAlongAxis,                Lambda,                             Concatenate, \
                             ViewAsWindows,                      ViewDimensionAsWindows,             OperationIterator, \
                             Regularization,                     Reparameterize,                     none, \

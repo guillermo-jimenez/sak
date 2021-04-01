@@ -1,4 +1,4 @@
-from typing import Tuple, Union, Iterable, List, Dict, Optional
+from typing import Tuple, Union, Iterable, List, Dict, Optional, Callable
 import sak
 import operator
 import networkx
@@ -223,6 +223,45 @@ class ModelGraph(Module):
         networkx.draw_networkx_edges(graph, pos, width=1.0, alpha=0.5)
         networkx.draw_networkx_labels(graph, pos, dict(zip(list(graph.nodes.keys()),list(graph.nodes.keys()))), font_size=16)
 
+
+class ModelWrapper(Module):
+    def __init__(self, operation: Union[Dict, Callable], input_mappings: List, output_names: List):
+        super(ModelWrapper, self).__init__()
+        if isinstance(operation, Callable):
+            self.operation = operation
+        elif isinstance(operation, Dict):
+            self.operation = from_dict(operation)
+        else:
+            raise ValueError("Required input 'operation' provided with invalid type {}".format(type(operation)))
+        self.input_mappings = input_mappings
+        self.output_names = output_names
+        
+    def __call__(self, *args, **kwargs):
+        # Check input and output types
+        assert all([isinstance(kwargs[k], Dict) for k in kwargs]), "Inputs and outputs must be specified as dicts"
+        
+        input_args = []
+        for inputs in self.input_mappings:
+            if isinstance(inputs, int):
+                input_args.append(args[inputs])
+            elif isinstance(inputs, List) or isinstance(inputs, Tuple):
+                dict_from,element = inputs
+                input_args.append(kwargs[dict_from][element])
+        
+        output = self.operation(*input_args)
+        mark_return = False
+        
+        if isinstance(output, Tuple):
+            if len(output) != len(self.output_names):
+                raise ValueError(f"Mismatch between expected ({len(self.output_names)}) and obtained ({len(output)}) output variables")
+            output = {self.output_names[i]: output[i] for i in range(len(self.output_names))}
+        else:
+            if len(self.output_names) != 1:
+                raise ValueError(f"Mismatch between expected ({len(self.output_names)}) and obtained ({len(output)}) output variables")
+            output = {self.output_names[0]: output for i in range(len(self.output_names))}
+
+        return output   
+    
 
 class Sequential(Module):
     r"""Another sequential container.
