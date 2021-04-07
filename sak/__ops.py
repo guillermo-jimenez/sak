@@ -1,12 +1,210 @@
-from typing import Any, Tuple, List, Iterable
+from typing import Union, Dict, List, Callable, Iterable, Tuple, Any
 import pandas as pd
 import numpy as np
 import os
 import json
+import copy
 import pathlib
 import pickle
 import importlib
+from warnings import warn
 
+################ DEFINE REQUIRED BEFORE ANYTHING ELSE ################
+# Blatantly stolen from https://github.com/pytorch/pytorch/blob/master/torch/optim/optimizer.py
+class _RequiredParameter(object):
+    """Singleton class representing a required parameter for an Optimizer."""
+    def __repr__(self):
+        return "<required parameter>"
+
+def check_required(obj, dic: dict):
+    for (param, value) in dic.items():
+        if value is required:
+            raise ValueError("Class {} instantiated without required parameter {}".format(obj.__class__, param))
+
+required = _RequiredParameter()
+
+################ ANY OTHER THING ################
+
+
+class Mapper:
+    def __init__(self, operation: Union[Dict, Callable], input_mappings: List = [], output_mappings: Dict = []):
+        if isinstance(operation, Callable):
+            self.operation = operation
+        elif isinstance(operation, Dict):
+            self.operation = from_dict(operation)
+        else:
+            raise ValueError("Required input 'operation' provided with invalid type {}".format(type(operation)))
+        self.input_mappings = input_mappings
+        self.output_mappings = output_mappings
+        
+    def __call__(self, *args, **kwargs):
+        # Check input and output types
+        assert all([isinstance(kwargs[k], Dict) for k in kwargs]), "Inputs and outputs must be specified as dicts"
+        
+        input_args = []
+        inputs = None
+        for inputs in self.input_mappings:
+            if isinstance(inputs, int):
+                input_args.append(args[inputs])
+            elif isinstance(inputs, List) or isinstance(inputs, Tuple):
+                dict_from,element = inputs
+                input_args.append(kwargs[dict_from][element])
+            else:
+                raise ValueError(f"""invalid input configuration, inputs should either be a list of indices (e.g. [0,8]) 
+                or a nested list of dict keys (e.g. [['inputs', 'x_value'], ['outputs', 'y_value']]). Got {self.input_mappings} 
+                as input mappings and the offending input pair is {inputs}""")
+        
+        output = self.operation(*input_args)
+        mark_return = False
+
+        if len(self.output_mappings) == 0:
+            return output
+        else:
+            if (not isinstance(output, List)) and (not isinstance(output, Tuple)):
+                assert len(self.output_mappings) == 1, "Mismatch between length of resulting operation. Broadcasting..."
+                output = [output]
+                
+            for i,outputs in enumerate(self.output_mappings):
+                if isinstance(outputs, int):
+                    if isinstance(args, Iterable):
+                        args = list(args)
+                        mark_return = True
+                    args[outputs] = output[i]
+                elif isinstance(outputs, Iterable):
+                    dict_from,element = outputs
+                    kwargs[dict_from][element] = output[i]
+                else:
+                    raise ValueError(f"""invalid output configuration, outputs should either be a list of indices (e.g. [0,8]) 
+                    or a nested list of dict keys (e.g. [['outputs', 'aaa'], ['inputs', 'bbb']]). Got {self.output_mappings} 
+                    as output mappings and the offending output pair is {outputs}""")
+        
+        if mark_return:
+            return tuple(args)
+
+
+class Caller:
+    def __init__(self, operation: Dict):
+        print(operation)
+        if isinstance(operation, Callable):
+            self.operation = operation
+        elif isinstance(operation, Dict):
+            self.operation = class_selector(operation["class"])
+        else:
+            raise ValueError("Required input 'operation' provided with invalid type {}".format(type(operation)))
+        self.arguments = arguments
+        
+    def __call__(self, *args, **kwargs):
+        return self.operation(**self.arguments)
+
+
+class ArgumentComposer:
+    def __init__(self, operation: Dict, input_mappings: List = [], output_mappings: Dict = []):
+        if isinstance(operation, Dict):
+            self.operation = copy.deepcopy(operation)
+        else:
+            raise ValueError("Required input 'operation' provided with invalid type {}".format(type(operation)))
+        self.input_mappings = input_mappings
+        self.output_mappings = output_mappings
+        
+    def __call__(self, *args, **kwargs):
+        # Check input and output types
+        assert all([isinstance(kwargs[k], Dict) for k in kwargs]), "Inputs and outputs must be specified as dicts"
+        
+        # Retrieve operation
+        operation = self.operation
+        operation["arguments"] = operation.get("arguments", {})
+        
+        # Retrieve input arguments as dict
+        for inputs in self.input_mappings:
+            if isinstance(inputs, List) or isinstance(inputs, Tuple):
+                if len(inputs) == 2:
+                    dict_from,element = inputs
+                    new_key_name = element
+                elif len(inputs) == 3:
+                    dict_from,element,new_key_name = inputs
+                else:
+                    raise ValueError("Only length 2 and length 3 lists are accepted (hacky)")
+                operation["arguments"][new_key_name] = kwargs[dict_from][element]
+            else:
+                raise ValueError(f"""invalid input configuration, inputs should be a a nested list of dict keys 
+                (e.g. [['inputs', 'x_value', 'rename_key'], ['outputs', 'y_value']]). Got 
+                {self.input_mappings} as input mappings and the offending input pair is {inputs}""")
+        
+        # Generate operation
+        output = from_dict(operation)
+        mark_return = False
+
+        if len(self.output_mappings) == 0:
+            return output
+        else:
+            if (not isinstance(output, List)) and (not isinstance(output, Tuple)):
+                assert len(self.output_mappings) == 1, "Mismatch between length of resulting operation. Broadcasting..."
+                output = [output]
+                
+            for i,outputs in enumerate(self.output_mappings):
+                if isinstance(outputs, int):
+                    if isinstance(args, Iterable):
+                        args = list(args)
+                        mark_return = True
+                    args[outputs] = output[i]
+                elif isinstance(outputs, Iterable):
+                    dict_from,element = outputs
+                    kwargs[dict_from][element] = output[i]
+                else:
+                    raise ValueError(f"""invalid output configuration, outputs should either be a list of indices (e.g. [0,8]) 
+                    or a nested list of dict keys (e.g. [['outputs', 'aaa'], ['inputs', 'bbb']]). Got {self.output_mappings} 
+                    as output mappings and the offending output pair is {outputs}""")
+        
+        if mark_return:
+            return tuple(args)
+
+
+class SeedSetter:
+    def __init__(self, seed: required):
+        check_required(self,{"seed": seed})
+        self.seed = seed
+    
+    def __call__(self):
+        try:
+            import numpy
+            numpy.random.seed(self.seed)
+        except ImportError:
+            pass
+        try:
+            import random
+            random.seed(self.seed)
+        except ImportError:
+            pass
+        try:
+            import torch
+            torch.random.manual_seed(self.seed)
+        except ImportError:
+            pass
+
+def to_tuple(*args):
+    return tuple(args)
+
+def set_seed(seed):
+    try:
+        import numpy
+        numpy.random.seed(seed)
+    except ImportError:
+        pass
+    try:
+        import random
+        random.seed(seed)
+    except ImportError:
+        pass
+    try:
+        import torch
+        torch.random.manual_seed(seed)
+    except ImportError:
+        pass
+    try:
+        import tensorflow
+        tensorflow.random.set_seed(seed)
+    except ImportError:
+        pass
 
 def load_config(path: str, model_name: str = None) -> dict:
     # Load json
@@ -127,14 +325,15 @@ def from_dict(operation: dict):
 
     # Default argument is empty
     operation["arguments"] = operation.get("arguments",{})
+    break_nested = operation.get("break_nested",False)
     
     # If the argument field has nested calls
-    if isinstance(operation["arguments"], dict):
+    if isinstance(operation["arguments"], dict) and not break_nested:
         for arg in operation["arguments"]:
             if isinstance(operation["arguments"][arg], dict):
                 if ("class" in operation["arguments"][arg]):
                     operation["arguments"][arg] = from_dict(operation["arguments"][arg])
-    if isinstance(operation["arguments"], list):
+    if isinstance(operation["arguments"], list) and not break_nested:
         for i,arg in enumerate(operation["arguments"]):
             if isinstance(arg, dict):
                 if ("class" in arg):
@@ -201,17 +400,6 @@ def class_selector(module_name: str, class_name: str = None):
         # return the class, will raise AttributeError if class cannot be found
     return getattr(m, class_name)
 
-# Blatantly stolen from https://github.com/pytorch/pytorch/blob/master/torch/optim/optimizer.py
-class _RequiredParameter(object):
-    """Singleton class representing a required parameter for an Optimizer."""
-    def __repr__(self):
-        return "<required parameter>"
-
-def check_required(obj, dic: dict):
-    for (param, value) in dic.items():
-        if value is required:
-            raise ValueError("Class {} instantiated without required parameter {}".format(obj.__class__, param))
-
 def reversed_enumerate(sequence, start=None):
     n = start
     if start is None:
@@ -220,4 +408,3 @@ def reversed_enumerate(sequence, start=None):
         yield n, elem
         n -= 1    
 
-required = _RequiredParameter()
