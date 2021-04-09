@@ -40,37 +40,44 @@ class SegmentationShift:
         assert (ratio_x <= 1) and (ratio_x >= 0), "Ratios should be in the interval [0,1]"
         assert (ratio_y <= 1) and (ratio_y >= 0), "Ratios should be in the interval [0,1]"
 
-    def __call__(self, x: torch.Tensor, y: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        assert x.shape[-2:] == y.shape[-2:], "The shapes of the input tensors do not coincide"
-        
+    def __call__(self, *args: List[torch.Tensor]) -> Tuple[torch.Tensor]:
+        for i,elem_i in enumerate(args):
+            assert isinstance(elem_i, torch.Tensor)
+
+            for j,elem_j in enumerate(args):
+                if i == j:
+                    continue
+                assert elem_i.shape[-2:] == elem_j.shape[-2:], "The shapes of the input tensors do not coincide"
+
         # Retrieve input shapes
-        bs,ch,h,w = x.shape
-        
-        # Obtain the number of samples to move
-        shift_x = round(np.random.uniform(-self.ratio_x, self.ratio_x)*w)
-        shift_y = round(np.random.uniform(-self.ratio_y, self.ratio_y)*h)
-        
-        # Shift tensors X dimensions
-        if shift_x > 0: 
-            x[...,:int(shift_x),:] = 0
-            y[...,:int(shift_x),:] = 0
-        else:
-            x[...,int(shift_x):,:] = 0
-            y[...,int(shift_x):,:] = 0
+        bs,ch,h,w = args[0].shape
 
         # Shift tensors X dimensions
-        if shift_y > 0: 
-            x[...,:,:int(shift_y)] = 0
-            y[...,:,:int(shift_y)] = 0
-        else:
-            x[...,:,int(shift_y):] = 0
-            y[...,:,int(shift_y):] = 0
+        outputs = [elem.clone() for elem in args]
+
+        for b in range(bs):
+            # Obtain the number of samples to move
+            shift_x = round(np.random.uniform(-self.ratio_x, self.ratio_x)*w)
+            shift_y = round(np.random.uniform(-self.ratio_y, self.ratio_y)*h)
+
+            print(shift_x,shift_y)
+
+            for i,elem in enumerate(outputs):
+                if shift_x >= 0: 
+                    elem[b,...,:int(shift_x),:] = 0
+                else:
+                    elem[b,...,int(shift_x):,:] = 0
+
+                # Shift tensors X dimensions
+                if shift_y >= 0: 
+                    elem[b,...,:,:int(shift_y)] = 0
+                else:
+                    elem[b,...,:,int(shift_y):] = 0
+
+                # Roll tensors
+                elem[b,] = torch.roll(elem[b,],(-shift_x,-shift_y),dims=(-2,-1))
             
-        # Roll tensors
-        x = torch.roll(x,(-shift_x,-shift_y),dims=(-2,-1))
-        y = torch.roll(y,(-shift_x,-shift_y),dims=(-2,-1))
-        
-        return x,y
+        return tuple(outputs)
 
 
 class SegmentationFlip:
@@ -80,25 +87,36 @@ class SegmentationFlip:
         assert (proba_x <= 1) and (proba_x >= 0), "Probabilities should be in the interval [0,1]"
         assert (proba_y <= 1) and (proba_y >= 0), "Probabilities should be in the interval [0,1]"
 
-    def __call__(self, x: torch.Tensor, y: torch.Tensor):
-        assert x.shape[-2:] == y.shape[-2:], "The shapes of the input tensors do not coincide"
+    def __call__(self, *args: List[torch.Tensor]) -> Tuple[torch.Tensor]:
+        for i,elem_i in enumerate(args):
+            assert isinstance(elem_i, torch.Tensor)
+
+            for j,elem_j in enumerate(args):
+                if i == j:
+                    continue
+                assert elem_i.shape[-2:] == elem_j.shape[-2:], "The shapes of the input tensors do not coincide"
         
         # Retrieve input shapes
-        bs,ch,h,w = x.shape
+        bs,ch,h,w = args[0].shape
         
         # Obtain the number of samples to move
         flip_x = np.random.rand() <= self.proba_x
         flip_y = np.random.rand() <= self.proba_y
         
-        # Flip tensors dimensions
-        if flip_x: 
-            x = torch.flip(x,[-1])
-            y = torch.flip(y,[-1])
-        if flip_y: 
-            x = torch.flip(x,[-2])
-            y = torch.flip(y,[-2])
-        
-        return x,y
+        # Shift tensors X dimensions
+        outputs = []
+
+        for elem in args:
+            # Flip tensors dimensions
+            if flip_x: 
+                elem = torch.flip(elem,[-1])
+            if flip_y: 
+                elem = torch.flip(elem,[-2])
+            
+            # Add as output
+            outputs.append(elem)
+            
+        return tuple(outputs)
 
 
 class ClipIntensities:
@@ -215,27 +233,43 @@ class AffineTransform(object):
         self.threshold_shear = threshold_shear
         self.threshold_translation = threshold_translation
 
-    def __call__(self, x: torch.Tensor, y: torch.Tensor):
-        # Output tensor
-        out_x = x.clone()
-        out_y = y.clone()
+    def __call__(self, *args: List[torch.Tensor]):
+        for i,elem_i in enumerate(args):
+            assert isinstance(elem_i, torch.Tensor)
 
+            for j,elem_j in enumerate(args):
+                if i == j:
+                    continue
+                assert elem_i.shape[-2:] == elem_j.shape[-2:], "The shapes of the input tensors do not coincide"
+        
+        # Retrieve input shapes
+        bs,ch,h,w = args[0].shape
+        
         # Apply transformation to each element in the batch
-        scale       = (np.random.rand(self.max_iterations,x.shape[0])*self.threshold_scale+(1-self.threshold_scale/2))
-        rotation    = (np.random.rand(self.max_iterations,x.shape[0])*self.threshold_rotation-self.threshold_rotation/2)
-        shear       = (np.random.rand(self.max_iterations,x.shape[0])*self.threshold_shear-self.threshold_shear/2)
-        translation = (np.random.rand(self.max_iterations,x.shape[0])*self.threshold_translation-self.threshold_translation/2)
-        for it in range(np.random.randint(self.max_iterations)):
-            for b in range(x.shape[0]):
-                # Define warp matrix
-                warp_matrix = skimage.transform.AffineTransform(None,scale[it,b],rotation[it,b],shear[it,b],translation[it,b])
+        scale       = (np.random.rand(self.max_iterations,bs)*self.threshold_scale+(1-self.threshold_scale/2))
+        rotation    = (np.random.rand(self.max_iterations,bs)*self.threshold_rotation-self.threshold_rotation/2)
+        shear       = (np.random.rand(self.max_iterations,bs)*self.threshold_shear-self.threshold_shear/2)
+        translation = (np.random.rand(self.max_iterations,bs)*self.threshold_translation-self.threshold_translation/2)
 
-                for c in range(x.shape[1]):
-                    out_x[b,c] = torch.tensor(skimage.transform.warp(out_x[b,c].numpy(), warp_matrix))
-                for c in range(y.shape[1]):
-                    out_y[b,c] = torch.tensor(skimage.transform.warp(out_y[b,c].numpy(), warp_matrix))
+        # Shift tensors X dimensions
+        outputs = []
 
-        return out_x, out_y
+        for elem in args:
+            # Output tensor
+            out_elem = elem.clone()
+
+            for it in range(np.random.randint(self.max_iterations)):
+                for b in range(elem.shape[0]):
+                    # Define warp matrix
+                    warp_matrix = skimage.transform.AffineTransform(None,scale[it,b],rotation[it,b],shear[it,b],translation[it,b])
+
+                    for c in range(elem.shape[1]):
+                        out_elem[b,c] = torch.tensor(skimage.transform.warp(out_elem[b,c].numpy(), warp_matrix))
+
+            # Add as output
+            outputs.append(out_elem)
+            
+        return tuple(outputs)
 
 
 class UpDownSample(object):
