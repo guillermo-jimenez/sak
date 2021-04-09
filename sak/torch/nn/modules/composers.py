@@ -236,7 +236,11 @@ class ModelWrapper(Module):
         self.input_mappings = input_mappings
         self.output_names = output_names
         
-    def __call__(self, *args, **kwargs):
+    def forward(self, *args, **kwargs):
+        if (len(args) == 1) and (len(kwargs) == 0):
+            kwargs = {"inputs": args[0]}
+            args = ()
+
         # Check input and output types
         assert all([isinstance(kwargs[k], Dict) for k in kwargs]), "Inputs and outputs must be specified as dicts"
         
