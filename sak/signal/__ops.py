@@ -72,6 +72,7 @@ def unflatten_along_axis(X: np.ndarray, shape: Tuple[int], axis: int):
     return X
 
 def moving_average(x, w=5, **kwargs):
+    kwargs["mode"] = kwargs.get("mode","edge")
     x = np.copy(x)
     x = np.pad(x,(w//2, w//2), **kwargs)
     return np.convolve(x, np.ones(w), 'valid') / w
