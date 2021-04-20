@@ -174,7 +174,12 @@ def zero_crossings(X: np.ndarray, axis: int = None) -> List[np.ndarray]:
     """Returns zero crossings of array"""
     # X = ordering_N_lead(X)
     if X.ndim == 1:
-        return np.where(np.diff(np.sign(X),prepend=np.sign(X[0])))[0]
+        signs = np.sign(X)
+        zero_diff = (signs == 0)*(np.diff(signs,prepend=signs[0]) + np.diff(signs,append=signs[-1]))
+        nonzero_diff = (np.abs(np.diff(signs,prepend=signs[0])) == 2)
+
+        diff = zero_diff + nonzero_diff
+        return np.where(diff)[0]
     elif X.ndim == 2:
         return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])))[0] for j in range(X.shape[1])]
     else:
@@ -199,6 +204,39 @@ def negative_zero_crossings(X: np.ndarray) -> List[np.ndarray]:
         return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])) > 0)[0] for j in range(X.shape[1])]
     else:
         raise NotImplementedError("negative_zero_crossings function not implemented for arrays larger than 2D")
+
+
+def zero_crossing_areas(X: np.ndarray, axis: int = None, normalize: bool = False) -> List[np.ndarray]:
+    """Returns zero crossings of array"""
+    # X = ordering_N_lead(X)
+    eps = np.finfo(X.dtype).eps
+    if X.ndim == 1:
+        crossings = zero_crossings(X)
+        crossings = np.concatenate(([0], crossings, [X.size-1]))
+
+        if normalize:
+            areas = np.array([np.trapz(X[a:b])/(b-a+eps) for a,b in zip(crossings[:-1],crossings[1:])])
+        else:
+            areas = np.array([np.trapz(X[a:b]) for a,b in zip(crossings[:-1],crossings[1:])])
+    elif (X.ndim == 2) and axis in [0,1]:
+        crossings = zero_crossings(X, axis=axis)
+        crossings = np.concatenate(([0], crossings, [X.size-1]))
+
+        if axis == 0:
+            if normalize:
+                areas = [np.array([np.trapz(X[a:b,i])/(b-a+eps)  for a,b in zip(crossings[:-1],crossings[1:])]) for i in range(X.shape[1])]
+            else:
+                areas = [np.array([np.trapz(X[a:b,i]) for a,b in zip(crossings[:-1],crossings[1:])]) for i in range(X.shape[1])]
+        else:
+            if normalize:
+                areas = [np.array([np.trapz(X[i,a:b])/(b-a+eps)  for a,b in zip(crossings[:-1],crossings[1:])]) for i in range(X.shape[0])]
+            else:
+                areas = [np.array([np.trapz(X[i,a:b]) for a,b in zip(crossings[:-1],crossings[1:])]) for i in range(X.shape[0])]
+    else:
+        raise NotImplementedError("zero_crossings function not implemented for arrays larger than 2D")
+
+    return areas
+
 
 def xcorr(x: np.ndarray, y: np.ndarray = None, normed: bool = True, maxlags: int = None) -> List[np.ndarray]:
     # Cross correlation of two signals of equal length
