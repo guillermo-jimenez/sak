@@ -60,8 +60,6 @@ class SegmentationShift:
             shift_x = round(np.random.uniform(-self.ratio_x, self.ratio_x)*w)
             shift_y = round(np.random.uniform(-self.ratio_y, self.ratio_y)*h)
 
-            print(shift_x,shift_y)
-
             for i,elem in enumerate(outputs):
                 if shift_x >= 0: 
                     elem[b,...,:int(shift_x),:] = 0
