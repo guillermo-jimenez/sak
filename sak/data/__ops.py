@@ -4,11 +4,17 @@ import copy
 import sak
 from sklearn.model_selection import train_test_split
 
-class Struct:
-    def __init__(self, structure: dict = {}, **kwargs):
-        structure.update(kwargs)
-        for key, value in structure.items():
-            setattr(self, key, value)
+# Applies to Python-3 Standard Library
+class Struct(object):
+    def __init__(self, data):
+        for name, value in data.items():
+            setattr(self, name, self._wrap(value))
+
+    def _wrap(self, value):
+        if isinstance(value, (tuple, list, set, frozenset)): 
+            return type(value)([self._wrap(v) for v in value])
+        else:
+            return Struct(value) if isinstance(value, dict) else value
 
 def ball_scaling(X: np.ndarray, metric: Callable = lambda x: np.max(x)-np.min(x), radius: float = 1.0):
     """Balls of radius != 1 not implemented yet"""
