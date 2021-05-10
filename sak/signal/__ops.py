@@ -279,7 +279,8 @@ def __xcorr_single(x: np.ndarray, y: np.ndarray, normed: bool, maxlags: int) -> 
 
     # Proceed to normalize output
     if normed:
-        n = np.sqrt(np.dot(x, x) * np.dot(y, y)) # this is the transformation function
+        # this is the transformation function
+        n = np.sqrt(np.dot(x, x) * np.dot(y, y)) + max([np.finfo(x.dtype).eps,np.finfo(y.dtype).eps])
         c = np.true_divide(c,n)
 
     # Retrieve lags vector and refine if maxlags < Nx-1
