@@ -315,7 +315,7 @@ def __xcorr_matrix(matrix, normed, maxlags):
     out = np.einsum('ijkl,ijkl->ijk',matrix_padded[None,:,:,:],matrix_padded[:,None,:,:])
     if normed:
         norm_x = np.einsum('ijk,ijk->ij',matrix[:,None,:],matrix[:,None,:])
-        norm = np.sqrt(norm_x*norm_x.T)
+        norm = np.sqrt(norm_x*norm_x.T)+np.finfo(matrix.dtype).eps
         out = np.true_divide(out,norm[...,None])
 
     # Use valid mask to skip columns and have the final output

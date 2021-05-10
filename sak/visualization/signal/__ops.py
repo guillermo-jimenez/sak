@@ -129,6 +129,10 @@ def standard(
     # Set limits
     [[ax[i,j].set_xlim([x[0],x[-1]]) for j in range(ax.shape[1])] for i in range(ax.shape[0])]
 
+    # Make the subplots closer, remove x axis ticks (except bottom ones)
+    [[ax[i,j].set_xticks([]) for i in range(5)] for j in range(2)]
+    fig.subplots_adjust(wspace=0.01,hspace=0.01)
+
     if returns:
         return fig,ax
     
