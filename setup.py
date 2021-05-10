@@ -13,7 +13,7 @@ setup(
                       "torch", "torchvision", "tqdm", "scikit-image", 
                       "networkx", "defusedxml"],
     # *strongly* suggested for sharing
-    version="0.0.2.0",
+    version="0.0.2.1",
     # The license can be anything you like
     classifiers=[
         "Programming Language :: Python :: 3",
