@@ -342,16 +342,11 @@ class RescaleIntensity(object):
     def __init__(self, out_range: str = 'float32'):
         self.out_range = out_range
 
-    def __call__(self, x: Union[torch.Tensor, List, Tuple]):
-        if isinstance(x,torch.Tensor):
-            out = torch.tensor(skimage.exposure.rescale_intensity(x.numpy(),out_range=self.out_range))
-        else:
-            out = []
-
-            for i in range(len(x)):
-                out.append(torch.tensor(skimage.exposure.rescale_intensity(x[i].numpy(),out_range=self.out_range)))
-
-        return out
+    def __call__(self, *x: Tuple[torch.Tensor]):
+        out = []
+        for i in range(len(x)):
+            out.append(torch.tensor(skimage.exposure.rescale_intensity(x[i].numpy(),out_range=self.out_range)))
+        return tuple(out)
 
 
 class SkimageLambda(object):
