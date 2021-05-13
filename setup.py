@@ -1,4 +1,21 @@
+import codecs
+import os.path
+
 from setuptools import setup, find_packages
+
+"""Reading version as proposed in https://packaging.python.org/guides/single-sourcing-package-version/"""
+def read(rel_path):
+    here = os.path.abspath(os.path.dirname(__file__))
+    with codecs.open(os.path.join(here, rel_path), 'r') as fp:
+        return fp.read()
+def get_version(rel_path):
+    for line in read(rel_path).splitlines():
+        if line.startswith('__version__'):
+            delim = '"' if '"' in line else "'"
+            return line.split(delim)[1]
+    else:
+        raise RuntimeError("Unable to find version string.")
+
 
 setup(
     name="sak",
@@ -13,7 +30,7 @@ setup(
                       "torch", "torchvision", "tqdm", "scikit-image", 
                       "networkx", "defusedxml"],
     # *strongly* suggested for sharing
-    version="0.0.2.3",
+    version=get_version("sak/__init__.py"),
     # The license can be anything you like
     classifiers=[
         "Programming Language :: Python :: 3",

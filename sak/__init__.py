@@ -21,6 +21,5 @@ from .__ops import ArgumentComposer
 import sak.image
 import sak.signal
 import sak.visualization
-# import sak.data
-# import sak.signal.wavelet
-# import sak.signal.spectral
+
+__version__ = "0.0.2.4"
