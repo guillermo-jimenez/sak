@@ -12,7 +12,7 @@ from .__ops import load_data
 from .__ops import load_config
 from .__ops import save_data
 from .__ops import argsort_as
-from .__ops import zip_next
+from .__ops import pairwise
 from .__ops import reversed_enumerate
 from .__ops import SeedSetter
 from .__ops import Mapper
@@ -23,4 +23,4 @@ import sak.image
 import sak.signal
 import sak.visualization
 
-__version__ = "0.0.2.5"
+__version__ = "0.0.2.6"

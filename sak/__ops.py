@@ -409,7 +409,7 @@ def reversed_enumerate(sequence, start=None):
         yield n, elem
         n -= 1    
 
-def zip_next(iterator,n=2):
+def pairwise(iterator,n=2):
     iterators = itertools.tee(iterator,n)
     for i in range(len(iterators)):
         for j in range(i):
