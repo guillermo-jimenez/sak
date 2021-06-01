@@ -23,4 +23,4 @@ import sak.image
 import sak.signal
 import sak.visualization
 
-__version__ = "0.0.2.6"
+__version__ = "0.0.2.7"
