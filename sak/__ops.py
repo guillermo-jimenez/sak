@@ -7,6 +7,7 @@ import copy
 import pathlib
 import pickle
 import importlib
+import itertools
 from warnings import warn
 
 ################ DEFINE REQUIRED BEFORE ANYTHING ELSE ################
@@ -408,3 +409,9 @@ def reversed_enumerate(sequence, start=None):
         yield n, elem
         n -= 1    
 
+def zip_next(iterator,n=2):
+    iterators = itertools.tee(iterator,n)
+    for i in range(len(iterators)):
+        for j in range(i):
+            next(iterators[i],None)
+    return zip(*iterators)
