@@ -12,6 +12,7 @@ from .__ops import load_data
 from .__ops import load_config
 from .__ops import save_data
 from .__ops import argsort_as
+from .__ops import zip_next
 from .__ops import reversed_enumerate
 from .__ops import SeedSetter
 from .__ops import Mapper
@@ -21,6 +22,5 @@ from .__ops import ArgumentComposer
 import sak.image
 import sak.signal
 import sak.visualization
-# import sak.data
-# import sak.signal.wavelet
-# import sak.signal.spectral
+
+__version__ = "0.0.2.5"
