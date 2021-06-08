@@ -18,9 +18,10 @@ from .__ops import SeedSetter
 from .__ops import Mapper
 from .__ops import Caller
 from .__ops import ArgumentComposer
+from .__ops import splitrfe
 
 import sak.image
 import sak.signal
 import sak.visualization
 
-__version__ = "0.0.2.7"
+__version__ = "0.0.2.8"

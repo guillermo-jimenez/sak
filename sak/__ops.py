@@ -415,3 +415,11 @@ def pairwise(iterator,n=2):
         for j in range(i):
             next(iterators[i],None)
     return zip(*iterators)
+
+def splitrfe(path: str) -> Tuple[str,str,str]:
+    """Split a pathname. Returns tuple "(root, filename, extension)", where "filename" is
+everything after the final slash and before the final dot and "extension" is everything after the final dot. Either part may be empty."""
+    root,fname = os.path.split(path)
+    fname,ext = os.path.splitext(fname)
+
+    return root,fname,ext
