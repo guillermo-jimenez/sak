@@ -6,7 +6,7 @@ from sklearn.model_selection import train_test_split
 
 # Applies to Python-3 Standard Library
 class Struct(object):
-    def __init__(self, data):
+    def __init__(self, data: dict = {}):
         for name, value in data.items():
             setattr(self, name, self._wrap(value))
 
