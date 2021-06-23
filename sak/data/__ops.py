@@ -16,6 +16,15 @@ class Struct(object):
         else:
             return Struct(value) if isinstance(value, dict) else value
 
+    def __repr__(self):
+        string = []
+        for k in self.__dict__:
+            if isinstance(self.__dict__[k],sak.data.Struct):
+                string.append(f"{k}: Struct")
+            else:
+                string.append(f"{k}: {self.__dict__[k]}")
+        return "\n".join(string)
+
 def ball_scaling(X: np.ndarray, metric: Callable = lambda x: np.max(x)-np.min(x), radius: float = 1.0):
     """Balls of radius != 1 not implemented yet"""
     if radius != 1.0:
