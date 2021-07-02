@@ -779,7 +779,6 @@ class F1InstanceLoss2dIntersection(torch.nn.Module):
 class SensibilityLoss1dIntersection(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3, smooth: float = 1):
         super().__init__()
-        self = sak.data.Struct()
         self.channels = channels
         if weight is None:
             self.weight = None
@@ -988,7 +987,6 @@ class SensibilityLoss2dIntersection(torch.nn.Module):
 class PrecisionLoss1dIntersection(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3, smooth: float = 1):
         super().__init__()
-        self = sak.data.Struct()
         self.channels = channels
         if weight is None:
             self.weight = None
