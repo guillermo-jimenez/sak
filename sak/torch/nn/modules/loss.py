@@ -99,7 +99,8 @@ class XCorrLoss(torch.nn.Module):
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
-            self.weight = self.weight.to(target.device)
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
             loss = loss*self.weight
 
         # Sum over channels
@@ -108,7 +109,9 @@ class XCorrLoss(torch.nn.Module):
         # Apply sample weight to samples
         if sample_weight is not None:
             if not isinstance(sample_weight, torch.Tensor):
-                sample_weight = torch.tensor(sample_weight).to(input.device)
+                sample_weight = torch.tensor(sample_weight).to(target.device)
+            if sample_weight.device != target.device:
+                sample_weight = sample_weight.to(target.device)
             loss *= sample_weight
 
         # Obtain loss
@@ -227,7 +230,8 @@ class DiceLoss(torch.nn.Module):
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
-            self.weight = self.weight.to(target.device)
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
             intersection = (intersection*self.weight)
             union = (union*self.weight)
             
@@ -276,7 +280,8 @@ class BoundDiceLoss1d(torch.nn.Module):
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
-        self.conv_op = self.conv_op.to(target.device)
+        if self.conv_op.weight.device != target.device:
+            self.conv_op = self.conv_op.to(target.device)
 
         # Retrieve boundaries
         boundary_input = self.conv_op(input).abs()
@@ -338,11 +343,12 @@ class BoundDiceLoss2d(torch.nn.Module):
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
-        self.prewittx   = self.prewittx.to(target.device)
-        self.prewitty   = self.prewitty.to(target.device)
-        if self.diagonal:
-            self.prewittxy  = self.prewittxy.to(target.device)
-            self.prewittyx  = self.prewittyx.to(target.device)
+        if self.prewittx.weight.device != target.device:
+            self.prewittx   = self.prewittx.to(target.device)
+            self.prewitty   = self.prewitty.to(target.device)
+            if self.diagonal:
+                self.prewittxy  = self.prewittxy.to(target.device)
+                self.prewittyx  = self.prewittyx.to(target.device)
 
         # Obtain number of structures of the input
         input_bound  = torch.zeros_like(input)
@@ -408,7 +414,8 @@ class F1InstanceLoss1d(torch.nn.Module):
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
-        self.prewitt = self.prewitt.to(target.device)
+        if self.prewitt.weight.device != target.device:
+            self.prewitt = self.prewitt.to(target.device)
 
         # Retrieve boundaries
         input_boundary = self.prewitt(input).abs()
@@ -422,7 +429,8 @@ class F1InstanceLoss1d(torch.nn.Module):
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
-            self.weight = self.weight.to(target.device)
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
             input_elements = input_elements*self.weight
             target_elements = target_elements*self.weight
 
@@ -497,9 +505,10 @@ class F1InstanceLoss2d(torch.nn.Module):
     
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
-        self.prewitt  =  self.prewitt.to(target.device)
-        self.prewittx = self.prewittx.to(target.device)
-        self.prewitty = self.prewitty.to(target.device)
+        if self.prewitt.weight.device != target.device:
+            self.prewitt  =  self.prewitt.to(target.device)
+            self.prewittx = self.prewittx.to(target.device)
+            self.prewitty = self.prewitty.to(target.device)
         
         # Obtain number of structures of the target
         target_bound_x    = self.prewittx(target).abs()
@@ -527,7 +536,8 @@ class F1InstanceLoss2d(torch.nn.Module):
         if self.weight is not None:
             # Assert compatible shapes
             assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
-            self.weight = self.weight.to(target.device)
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
             input_elements  =  input_elements*self.weight
             target_elements = target_elements*self.weight
             
@@ -551,6 +561,639 @@ class F1InstanceLoss2d(torch.nn.Module):
 
 
 
+
+
+
+
+
+class F1InstanceLoss1dIntersection(torch.nn.Module):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3, smooth: float = 1.):
+        super().__init__()
+        self.channels = channels
+        if weight is None:
+            self.weight = None
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+        
+        # Define auxiliary loss
+        self.kernel_size = kernel_size
+        self.smooth = smooth
+        
+        # Define convolutional operation
+        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        
+        # Mark as non-trainable
+        for param in self.prewitt.parameters():
+            param.requires_grad = False
+
+        # Override weights
+        self.prewitt.weight[:,:,:] = 0.
+        for c in range(self.channels):
+            self.prewitt.weight[c,c, 0] = -1.
+            self.prewitt.weight[c,c,-1] =  1.
+
+    
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
+        # Move operation to device
+        if self.prewitt.weight.device != target.device:
+            self.prewitt = self.prewitt.to(target.device)
+
+        # Intersection between masks
+        intersection          = (input*target)
+
+        # Retrieve boundaries
+        intersection_boundary = self.prewitt(intersection).abs()
+        input_boundary        = self.prewitt(input).abs()
+        target_boundary       = self.prewitt(target).abs()
+
+        # Sum of elements alongside the spatial dimensions
+        intersection_elements = intersection_boundary.sum(-1)/4
+        input_elements        = input_boundary.sum(-1)/4
+        target_elements       = target_boundary.sum(-1)/4
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
+            
+            # Multiply detected elements by class weight
+            intersection_elements = intersection_elements*self.weight
+            input_elements        = input_elements*self.weight
+            target_elements       = target_elements*self.weight
+
+        # F1 loss
+        mismatches    = (intersection_elements-input_elements).clamp_min(0)
+        truepositive  = (intersection_elements-mismatches).abs()
+        falsenegative = (target_elements-intersection_elements).clamp_min(0)+mismatches
+        falsepositive = (input_elements-intersection_elements).clamp_min(0)
+
+        # F1 loss
+        loss = 1-(2*truepositive + self.smooth)/(2*truepositive + falsepositive + falsenegative + self.smooth)
+
+        # Sum over channels
+        loss = loss.sum(-1)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Obtain loss
+        return self.reduction(loss)
+
+
+class F1InstanceLoss2dIntersection(torch.nn.Module):
+    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', kernel_size: int = 3, smooth: float = 1.):
+        super().__init__()
+        # Save inputs
+        self.channels = channels
+        if weight is None:
+            self.weight = torch.ones((1,self.channels))
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+
+        # Check weights size
+        assert self.weight.size(-1) == channels, "The number of provided channels and the associated weights do not match"
+        
+        # Define auxiliary loss
+        self.kernel_size = kernel_size
+        self.smooth = smooth
+        
+        # Define convolutional operation
+        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+
+        # Mark as non-trainable
+        for param in self.prewitt.parameters():  param.requires_grad = False
+        for param in self.prewittx.parameters(): param.requires_grad = False
+        for param in self.prewitty.parameters(): param.requires_grad = False
+
+        # Override weights to make Prewitt filters
+        self.prewitt.weight[...]  = 0.
+        self.prewittx.weight[...] = 0.
+        self.prewitty.weight[...] = 0.
+        for c in range(self.channels):
+            # border
+            self.prewitt.weight[c,c, 0]    = -1.
+            self.prewitt.weight[c,c,-1]    =  1.
+            # x
+            self.prewittx.weight[c,c, 0,0] = -1.
+            self.prewittx.weight[c,c,-1,0] =  1.
+            # y
+            self.prewitty.weight[c,c,0, 0] = -1.
+            self.prewitty.weight[c,c,0,-1] =  1.
+
+    
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
+        # Move operation to device
+        if self.prewitt.weight.device != target.device:
+            self.prewitt  =  self.prewitt.to(target.device)
+            self.prewittx = self.prewittx.to(target.device)
+            self.prewitty = self.prewitty.to(target.device)
+
+        # Intersection between masks
+        intersection      = (input*target)
+        
+        # Obtain number of structures of the intersection
+        intersection_bound_x    = self.prewittx(intersection).abs()
+        intersection_bound_x_1d = self.prewitt(intersection_bound_x.sum(-2)).abs()
+        intersection_elements_x = torch.flatten(intersection_bound_x_1d, start_dim=2).sum(-1)/(4**2)
+        
+        intersection_bound_y    = self.prewitty(intersection).abs()
+        intersection_bound_y_1d = self.prewitt(intersection_bound_y.sum(-1)).abs()
+        intersection_elements_y = torch.flatten(intersection_bound_y_1d, start_dim=2).sum(-1)/(4**2)
+        
+        # Obtain number of structures of the target
+        target_bound_x          = self.prewittx(target).abs()
+        target_bound_x_1d       = self.prewitt(target_bound_x.sum(-2)).abs()
+        target_elements_x       = torch.flatten(target_bound_x_1d, start_dim=2).sum(-1)/(4**2)
+        
+        target_bound_y          = self.prewitty(target).abs()
+        target_bound_y_1d       = self.prewitt(target_bound_y.sum(-1)).abs()
+        target_elements_y       = torch.flatten(target_bound_y_1d, start_dim=2).sum(-1)/(4**2)
+        
+        # Obtain number of structures of the input
+        input_bound_x           = self.prewittx(input).abs()
+        input_bound_x_1d        = self.prewitt(input_bound_x.sum(-2)).abs()
+        input_elements_x        = torch.flatten(input_bound_x_1d, start_dim=2).sum(-1)/(4**2)
+        
+        input_bound_y           = self.prewitty(input).abs()
+        input_bound_y_1d        = self.prewitt(input_bound_y.sum(-1)).abs()
+        input_elements_y        = torch.flatten(input_bound_y_1d, start_dim=2).sum(-1)/(4**2)
+
+        # Aggregate x and y dimensions
+        intersection_elements   = intersection_elements_x + intersection_elements_y
+        input_elements          = input_elements_x + input_elements_y
+        target_elements         = target_elements_x + target_elements_y
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
+            
+            # Multiply detected elements by class weight
+            intersection_elements = intersection_elements*self.weight
+            input_elements  =  input_elements*self.weight
+            target_elements = target_elements*self.weight
+            
+        # F1 loss
+        mismatches    = (intersection_elements-input_elements).clamp_min(0)
+        truepositive  = (intersection_elements-mismatches).abs()
+        falsenegative = (target_elements-intersection_elements).clamp_min(0)+mismatches
+        falsepositive = (input_elements-intersection_elements).clamp_min(0)
+
+        # F1 loss
+        loss = 1-(2*truepositive + 1)/(2*truepositive + falsepositive + falsenegative + 1)
+
+        # Sum over channels
+        loss = loss.sum(-1)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Obtain per-sample loss
+        return self.reduction(loss)
+
+
+class SensibilityLoss1dIntersection(torch.nn.Module):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3, smooth: float = 1):
+        self = sak.data.Struct()
+        self.channels = channels
+        if weight is None:
+            self.weight = None
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+
+        # Define auxiliary loss
+        self.kernel_size = kernel_size
+        self.smooth = smooth
+
+        # Define convolutional operation
+        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+
+        # Mark as non-trainable
+        for param in self.prewitt.parameters():
+            param.requires_grad = False
+
+        # Override weights
+        self.prewitt.weight[:,:,:] = 0.
+        for c in range(self.channels):
+            self.prewitt.weight[c,c, 0] = -1.
+            self.prewitt.weight[c,c,-1] =  1.
+
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None) -> torch.tensor:
+        # Move operation to device
+        if self.prewitt.weight.device != target.device:
+            self.prewitt.to(target.device)
+
+        # Intersection between masks
+        intersection = (input*target)
+
+        # Retrieve boundaries
+        intersection_boundary = self.prewitt(intersection).abs()
+        input_boundary        = self.prewitt(input).abs()
+        target_boundary       = self.prewitt(target).abs()
+
+        # Sum of elements alongside the spatial dimensions
+        intersection_elements = intersection_boundary.sum(-1)/4
+        input_elements        = input_boundary.sum(-1)/4
+        target_elements       = target_boundary.sum(-1)/4
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
+            
+            # Multiply detected elements by class weight
+            intersection_elements = intersection_elements*self.weight
+            input_elements        = input_elements*self.weight
+            target_elements       = target_elements*self.weight
+
+        # F1 loss
+        mismatches    = (intersection_elements-input_elements).clamp_min(0)
+        truepositive  = (intersection_elements-mismatches).abs()
+        falsenegative = (target_elements-intersection_elements).clamp_min(0)+mismatches
+        falsepositive = (input_elements-intersection_elements).clamp_min(0)
+
+        # Sensitivity loss
+        loss = 1 - (truepositive + self.smooth)/(truepositive + falsenegative + self.smooth)
+
+        # Sum over channels
+        loss = loss.sum(-1)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Obtain loss
+        return self.reduction(loss)
+
+
+class SensibilityLoss2dIntersection(torch.nn.Module):
+    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', kernel_size: int = 3, smooth: float = 1):
+        super().__init__()
+        # Save inputs
+        self.channels = channels
+        if weight is None:
+            self.weight = torch.ones((1,self.channels))
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+
+        # Check weights size
+        assert self.weight.size(-1) == channels, "The number of provided channels and the associated weights do not match"
+        
+        # Define auxiliary loss
+        self.kernel_size = kernel_size
+        self.smooth = smooth
+        
+        # Define convolutional operation
+        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+
+        # Mark as non-trainable
+        for param in self.prewitt.parameters():  param.requires_grad = False
+        for param in self.prewittx.parameters(): param.requires_grad = False
+        for param in self.prewitty.parameters(): param.requires_grad = False
+
+        # Override weights to make Prewitt filters
+        self.prewitt.weight[...]  = 0.
+        self.prewittx.weight[...] = 0.
+        self.prewitty.weight[...] = 0.
+        for c in range(self.channels):
+            # border
+            self.prewitt.weight[c,c, 0]    = -1.
+            self.prewitt.weight[c,c,-1]    =  1.
+            # x
+            self.prewittx.weight[c,c, 0,0] = -1.
+            self.prewittx.weight[c,c,-1,0] =  1.
+            # y
+            self.prewitty.weight[c,c,0, 0] = -1.
+            self.prewitty.weight[c,c,0,-1] =  1.
+
+    
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
+        # Move operation to device
+        if self.prewitt.weight.device != target.device:
+            self.prewitt  =  self.prewitt.to(target.device)
+            self.prewittx = self.prewittx.to(target.device)
+            self.prewitty = self.prewitty.to(target.device)
+
+        # Intersection between masks
+        intersection      = (input*target)
+        
+        # Obtain number of structures of the intersection
+        intersection_bound_x    = self.prewittx(intersection).abs()
+        intersection_bound_x_1d = self.prewitt(intersection_bound_x.sum(-2)).abs()
+        intersection_elements_x = torch.flatten(intersection_bound_x_1d, start_dim=2).sum(-1)/(4**2)
+        
+        intersection_bound_y    = self.prewitty(intersection).abs()
+        intersection_bound_y_1d = self.prewitt(intersection_bound_y.sum(-1)).abs()
+        intersection_elements_y = torch.flatten(intersection_bound_y_1d, start_dim=2).sum(-1)/(4**2)
+        
+        # Obtain number of structures of the target
+        target_bound_x          = self.prewittx(target).abs()
+        target_bound_x_1d       = self.prewitt(target_bound_x.sum(-2)).abs()
+        target_elements_x       = torch.flatten(target_bound_x_1d, start_dim=2).sum(-1)/(4**2)
+        
+        target_bound_y          = self.prewitty(target).abs()
+        target_bound_y_1d       = self.prewitt(target_bound_y.sum(-1)).abs()
+        target_elements_y       = torch.flatten(target_bound_y_1d, start_dim=2).sum(-1)/(4**2)
+        
+        # Obtain number of structures of the input
+        input_bound_x           = self.prewittx(input).abs()
+        input_bound_x_1d        = self.prewitt(input_bound_x.sum(-2)).abs()
+        input_elements_x        = torch.flatten(input_bound_x_1d, start_dim=2).sum(-1)/(4**2)
+        
+        input_bound_y           = self.prewitty(input).abs()
+        input_bound_y_1d        = self.prewitt(input_bound_y.sum(-1)).abs()
+        input_elements_y        = torch.flatten(input_bound_y_1d, start_dim=2).sum(-1)/(4**2)
+
+        # Aggregate x and y dimensions
+        intersection_elements   = intersection_elements_x + intersection_elements_y
+        input_elements          = input_elements_x + input_elements_y
+        target_elements         = target_elements_x + target_elements_y
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
+            
+            # Multiply detected elements by class weight
+            intersection_elements = intersection_elements*self.weight
+            input_elements  =  input_elements*self.weight
+            target_elements = target_elements*self.weight
+            
+        # F1 loss
+        mismatches    = (intersection_elements-input_elements).clamp_min(0)
+        truepositive  = (intersection_elements-mismatches).abs()
+        falsenegative = (target_elements-intersection_elements).clamp_min(0)+mismatches
+        falsepositive = (input_elements-intersection_elements).clamp_min(0)
+
+        # Sensitivity loss
+        loss = 1 - (truepositive + self.smooth)/(truepositive + falsenegative + self.smooth)
+
+        # Sum over channels
+        loss = loss.sum(-1)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Obtain per-sample loss
+        return self.reduction(loss)
+
+
+class PrecisionLoss1dIntersection(torch.nn.Module):
+    def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3, smooth: float = 1):
+        self = sak.data.Struct()
+        self.channels = channels
+        if weight is None:
+            self.weight = None
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+
+        # Define auxiliary loss
+        self.kernel_size = kernel_size
+        self.smooth = smooth
+
+        # Define convolutional operation
+        self.prewitt = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+
+        # Mark as non-trainable
+        for param in self.prewitt.parameters():
+            param.requires_grad = False
+
+        # Override weights
+        self.prewitt.weight[:,:,:] = 0.
+        for c in range(self.channels):
+            self.prewitt.weight[c,c, 0] = -1.
+            self.prewitt.weight[c,c,-1] =  1.
+
+
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None) -> torch.tensor:
+        # Move operation to device
+        if self.prewitt.weight.device != target.device:
+            self.prewitt.to(target.device)
+
+        # Intersection between masks
+        intersection = (input*target)
+
+        # Retrieve boundaries
+        intersection_boundary = self.prewitt(intersection).abs()
+        input_boundary        = self.prewitt(input).abs()
+        target_boundary       = self.prewitt(target).abs()
+
+        # Sum of elements alongside the spatial dimensions
+        intersection_elements = intersection_boundary.sum(-1)/4
+        input_elements        = input_boundary.sum(-1)/4
+        target_elements       = target_boundary.sum(-1)/4
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
+            
+            # Multiply detected elements by class weight
+            intersection_elements = intersection_elements*self.weight
+            input_elements        = input_elements*self.weight
+            target_elements       = target_elements*self.weight
+
+        # F1 loss
+        mismatches    = (intersection_elements-input_elements).clamp_min(0)
+        truepositive  = (intersection_elements-mismatches).abs()
+        falsenegative = (target_elements-intersection_elements).clamp_min(0)+mismatches
+        falsepositive = (input_elements-intersection_elements).clamp_min(0)
+
+        # Sensitivity loss
+        loss = 1 - (truepositive + self.smooth)/(truepositive + falsepositive + self.smooth)
+
+        # Sum over channels
+        loss = loss.sum(-1)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Obtain loss
+        return self.reduction(loss)
+
+
+class PrecisionLoss2dIntersection(torch.nn.Module):
+    def __init__(self, channels: int = 1, weight: Iterable = None, reduction: str = 'mean', kernel_size: int = 3, smooth: float = 1):
+        super().__init__()
+        # Save inputs
+        self.channels = channels
+        if weight is None:
+            self.weight = torch.ones((1,self.channels))
+        else:
+            if not isinstance(weight, torch.Tensor):
+                self.weight = torch.tensor(weight)
+            else:
+                self.weight = weight
+            if self.weight.dim() == 1:
+                self.weight = self.weight[None,]
+        if reduction == 'mean':   self.reduction = torch.mean
+        elif reduction == 'sum':  self.reduction = torch.sum
+        elif reduction == 'none': self.reduction = lambda x: x
+
+        # Check weights size
+        assert self.weight.size(-1) == channels, "The number of provided channels and the associated weights do not match"
+        
+        # Define auxiliary loss
+        self.kernel_size = kernel_size
+        self.smooth = smooth
+        
+        # Define convolutional operation
+        self.prewitt  = Conv1d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewittx = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+        self.prewitty = Conv2d(self.channels,self.channels,self.kernel_size,padding=(self.kernel_size-1)//2,bias=False)
+
+        # Mark as non-trainable
+        for param in self.prewitt.parameters():  param.requires_grad = False
+        for param in self.prewittx.parameters(): param.requires_grad = False
+        for param in self.prewitty.parameters(): param.requires_grad = False
+
+        # Override weights to make Prewitt filters
+        self.prewitt.weight[...]  = 0.
+        self.prewittx.weight[...] = 0.
+        self.prewitty.weight[...] = 0.
+        for c in range(self.channels):
+            # border
+            self.prewitt.weight[c,c, 0]    = -1.
+            self.prewitt.weight[c,c,-1]    =  1.
+            # x
+            self.prewittx.weight[c,c, 0,0] = -1.
+            self.prewittx.weight[c,c,-1,0] =  1.
+            # y
+            self.prewitty.weight[c,c,0, 0] = -1.
+            self.prewitty.weight[c,c,0,-1] =  1.
+
+    
+    def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
+        # Move operation to device
+        if self.prewitt.weight.device != target.device:
+            self.prewitt  =  self.prewitt.to(target.device)
+            self.prewittx = self.prewittx.to(target.device)
+            self.prewitty = self.prewitty.to(target.device)
+
+        # Intersection between masks
+        intersection      = (input*target)
+        
+        # Obtain number of structures of the intersection
+        intersection_bound_x    = self.prewittx(intersection).abs()
+        intersection_bound_x_1d = self.prewitt(intersection_bound_x.sum(-2)).abs()
+        intersection_elements_x = torch.flatten(intersection_bound_x_1d, start_dim=2).sum(-1)/(4**2)
+        
+        intersection_bound_y    = self.prewitty(intersection).abs()
+        intersection_bound_y_1d = self.prewitt(intersection_bound_y.sum(-1)).abs()
+        intersection_elements_y = torch.flatten(intersection_bound_y_1d, start_dim=2).sum(-1)/(4**2)
+        
+        # Obtain number of structures of the target
+        target_bound_x          = self.prewittx(target).abs()
+        target_bound_x_1d       = self.prewitt(target_bound_x.sum(-2)).abs()
+        target_elements_x       = torch.flatten(target_bound_x_1d, start_dim=2).sum(-1)/(4**2)
+        
+        target_bound_y          = self.prewitty(target).abs()
+        target_bound_y_1d       = self.prewitt(target_bound_y.sum(-1)).abs()
+        target_elements_y       = torch.flatten(target_bound_y_1d, start_dim=2).sum(-1)/(4**2)
+        
+        # Obtain number of structures of the input
+        input_bound_x           = self.prewittx(input).abs()
+        input_bound_x_1d        = self.prewitt(input_bound_x.sum(-2)).abs()
+        input_elements_x        = torch.flatten(input_bound_x_1d, start_dim=2).sum(-1)/(4**2)
+        
+        input_bound_y           = self.prewitty(input).abs()
+        input_bound_y_1d        = self.prewitt(input_bound_y.sum(-1)).abs()
+        input_elements_y        = torch.flatten(input_bound_y_1d, start_dim=2).sum(-1)/(4**2)
+
+        # Aggregate x and y dimensions
+        intersection_elements   = intersection_elements_x + intersection_elements_y
+        input_elements          = input_elements_x + input_elements_y
+        target_elements         = target_elements_x + target_elements_y
+
+        # Apply class weights
+        if self.weight is not None:
+            # Assert compatible shapes
+            assert self.weight.shape[-1] == input.shape[1], "The number of channels and provided class weights does not coincide"
+            if self.weight.device != target.device:
+                self.weight = self.weight.to(target.device)
+            
+            # Multiply detected elements by class weight
+            intersection_elements = intersection_elements*self.weight
+            input_elements  =  input_elements*self.weight
+            target_elements = target_elements*self.weight
+            
+        # F1 loss
+        mismatches    = (intersection_elements-input_elements).clamp_min(0)
+        truepositive  = (intersection_elements-mismatches).abs()
+        falsenegative = (target_elements-intersection_elements).clamp_min(0)+mismatches
+        falsepositive = (input_elements-intersection_elements).clamp_min(0)
+
+        # Sensitivity loss
+        loss = 1 - (truepositive + self.smooth)/(truepositive + falsepositive + self.smooth)
+
+        # Sum over channels
+        loss = loss.sum(-1)
+
+        # Apply sample weight to samples
+        if sample_weight is not None:
+            loss *= sample_weight
+
+        # Obtain per-sample loss
+        return self.reduction(loss)
 
 
 
