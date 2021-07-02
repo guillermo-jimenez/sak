@@ -778,6 +778,7 @@ class F1InstanceLoss2dIntersection(torch.nn.Module):
 
 class SensibilityLoss1dIntersection(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3, smooth: float = 1):
+        super().__init__()
         self = sak.data.Struct()
         self.channels = channels
         if weight is None:
@@ -809,7 +810,6 @@ class SensibilityLoss1dIntersection(torch.nn.Module):
         for c in range(self.channels):
             self.prewitt.weight[c,c, 0] = -1.
             self.prewitt.weight[c,c,-1] =  1.
-
 
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None) -> torch.tensor:
         # Move operation to device
@@ -911,7 +911,6 @@ class SensibilityLoss2dIntersection(torch.nn.Module):
             self.prewitty.weight[c,c,0, 0] = -1.
             self.prewitty.weight[c,c,0,-1] =  1.
 
-    
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
         if self.prewitt.weight.device != target.device:
@@ -988,6 +987,7 @@ class SensibilityLoss2dIntersection(torch.nn.Module):
 
 class PrecisionLoss1dIntersection(torch.nn.Module):
     def __init__(self, channels: int = 1, reduction: str = 'mean', weight: Iterable = None, kernel_size: int = 3, smooth: float = 1):
+        super().__init__()
         self = sak.data.Struct()
         self.channels = channels
         if weight is None:
@@ -1019,7 +1019,6 @@ class PrecisionLoss1dIntersection(torch.nn.Module):
         for c in range(self.channels):
             self.prewitt.weight[c,c, 0] = -1.
             self.prewitt.weight[c,c,-1] =  1.
-
 
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None) -> torch.tensor:
         # Move operation to device
@@ -1121,7 +1120,6 @@ class PrecisionLoss2dIntersection(torch.nn.Module):
             self.prewitty.weight[c,c,0, 0] = -1.
             self.prewitty.weight[c,c,0,-1] =  1.
 
-    
     def forward(self, input: torch.Tensor, target: torch.Tensor, sample_weight: torch.Tensor = None):
         # Move operation to device
         if self.prewitt.weight.device != target.device:
