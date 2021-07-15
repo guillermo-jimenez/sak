@@ -3,8 +3,10 @@ from .modules.loss import   CompoundLoss,                       XCorrLoss,      
                             PearsonCorrelationLoss,             KLD_MSE,                            KLD_BCE, \
                             KLDivergence,                       DiceLoss,                           BoundDiceLoss1d, \
                             F1InstanceLoss1d,                   BoundDiceLoss2d,                    F1InstanceLoss2d, \
-                            F1InstanceLoss1dIntersection,       F1InstanceLoss2dIntersection,       SensibilityLoss1dIntersection, \
-                            SensibilityLoss2dIntersection,      PrecisionLoss1dIntersection,        PrecisionLoss2dIntersection
+                            SensibilityLoss1d,                  SensibilityLoss2d,                  PrecisionLoss1d, \
+                            PrecisionLoss2d,                    F1InstanceLoss1dIntersection,       F1InstanceLoss2dIntersection, \
+                            SensibilityLoss1dIntersection,      SensibilityLoss2dIntersection,      PrecisionLoss1dIntersection, \
+                            PrecisionLoss2dIntersection
 from .modules.models import CNN,                                DNN,                                DCC, \
                             Residual,                           SelfAttention
 from .modules.modules import ImagePooling1d,                    ImagePooling2d,                     ImagePooling3d, \
