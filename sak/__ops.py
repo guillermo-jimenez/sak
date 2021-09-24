@@ -5,6 +5,7 @@ import os
 import json
 import copy
 import pathlib
+import datetime
 import pickle
 import importlib
 import itertools
@@ -207,7 +208,7 @@ def set_seed(seed):
     except ImportError:
         pass
 
-def load_config(path: str, model_name: str = None) -> dict:
+def load_config(path: str, model_name: str = None, include_time: bool = True) -> dict:
     # Load json
     with open(path, "r") as f:
         config = json.load(f)
@@ -238,7 +239,12 @@ def load_config(path: str, model_name: str = None) -> dict:
             model_name,ext = os.path.splitext(file)
         
         # Change path to contain model name
-        config[str_savedir] = os.path.join(config[str_savedir], model_name)
+        if include_time:
+            time = datetime.datetime.now().isoformat()
+            time = time.replace(":","_").replace("-","_").replace(".","_").replace("T","___")
+            config[str_savedir] = os.path.join(config[str_savedir], f"{model_name}_{time}")
+        else:
+            config[str_savedir] = os.path.join(config[str_savedir], model_name)
 
         # Make dir for output files
         if not os.path.isdir(config[str_savedir]):
@@ -261,7 +267,7 @@ def as_tuple(*args: Tuple[Any]) -> Tuple:
     return args
 
 # Data loader to un-clutter code    
-def load_data(file, dtype=int,start_dim=1):
+def load_data(file, dtype = int, start_dim = 1):
     dic = dict()
     with open(file) as f:
         text = list(f)
