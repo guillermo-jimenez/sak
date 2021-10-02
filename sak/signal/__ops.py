@@ -212,7 +212,10 @@ def zero_crossing_areas(X: np.ndarray, axis: int = None, normalize: bool = False
     eps = np.finfo(X.dtype).eps
     if X.ndim == 1:
         crossings = zero_crossings(X)
-        crossings = np.concatenate(([0], crossings, [X.size-1]))
+        if 0 not in crossings:
+            crossings = np.concatenate(([0],crossings))
+        if X.size-1 not in crossings:
+            crossings = np.concatenate((crossings,[X.size-1]))
 
         if normalize:
             areas = np.array([np.trapz(X[a:b])/(b-a+eps) for a,b in zip(crossings[:-1],crossings[1:])])
@@ -220,7 +223,10 @@ def zero_crossing_areas(X: np.ndarray, axis: int = None, normalize: bool = False
             areas = np.array([np.trapz(X[a:b]) for a,b in zip(crossings[:-1],crossings[1:])])
     elif (X.ndim == 2) and axis in [0,1]:
         crossings = zero_crossings(X, axis=axis)
-        crossings = np.concatenate(([0], crossings, [X.size-1]))
+        if 0 not in crossings:
+            crossings = np.concatenate(([0],crossings))
+        if X.size-1 not in crossings:
+            crossings = np.concatenate((crossings,[X.size-1]))
 
         if axis == 0:
             if normalize:
