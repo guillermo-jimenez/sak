@@ -86,7 +86,7 @@ def moving_average(x, w=5, axis=-1, **kwargs):
 
     # Pad array
     out = np.zeros(x.shape)
-    x = np.pad(x,((0,0),(w+1, w+1)), mode=mode)
+    x = np.pad(x,((0,0),(w+1, w+1)), **kwargs)
 
     # Convolve each element separately
     for i,slice in enumerate(x):
