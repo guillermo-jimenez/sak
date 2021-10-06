@@ -71,11 +71,34 @@ def unflatten_along_axis(X: np.ndarray, shape: Tuple[int], axis: int):
         X = np.swapaxes(X,i,i+1)
     return X
 
-def moving_average(x, w=5, **kwargs):
+def moving_average(x, w=5, axis=-1, **kwargs):
     kwargs["mode"] = kwargs.get("mode","edge")
     x = np.copy(x)
-    x = np.pad(x,(w//2, w//2), **kwargs)
-    return np.convolve(x, np.ones(w), 'valid') / w
+    transpose,squeeze = False,False
+    if x.ndim == 1:
+        squeeze = True
+        x = x[:,None]
+    if x.ndim != 2:
+        raise ValueError("Function works with 2-dimensional data at most")
+    if (axis == 0) or (axis == -2):
+        transpose = True
+        x = x.T
+
+    # Pad array
+    out = np.zeros(x.shape)
+    x = np.pad(x,((0,0),(w+1, w+1)), mode=mode)
+
+    # Convolve each element separately
+    for i,slice in enumerate(x):
+        out[i,] = (np.convolve(slice, np.ones(w), 'same') / w)[w+1:-(w+1)]
+
+    if transpose:
+        out = out.T
+
+    if squeeze:
+        out = out.squeeze()
+
+    return out
 
 def amplitude(X: np.ndarray, **kwargs) -> np.ndarray:
     return np.max(X,**kwargs) - np.min(X,**kwargs)
