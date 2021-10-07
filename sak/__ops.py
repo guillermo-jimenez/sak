@@ -165,6 +165,7 @@ class SeedSetter:
     def __init__(self, seed: required):
         check_required(self,{"seed": seed})
         self.seed = seed
+        self()
     
     def __call__(self):
         try:
