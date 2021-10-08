@@ -77,7 +77,7 @@ def moving_average(x, w=5, axis=-1, **kwargs):
     transpose,squeeze = False,False
     if x.ndim == 1:
         squeeze = True
-        x = x[:,None]
+        x = x[None,:]
     if x.ndim != 2:
         raise ValueError("Function works with 2-dimensional data at most")
     if (axis == 0) or (axis == -2):
