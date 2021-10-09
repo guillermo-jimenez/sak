@@ -193,7 +193,7 @@ def extrema(X: np.ndarray, sampfrom: int = 0, sampto: int = None) -> List[np.nda
     else:
         raise NotImplementedError("extrema function not implemented for arrays larger than 2D")
 
-def zero_crossings(X: np.ndarray, axis: int = None) -> List[np.ndarray]:
+def zero_crossings(X: np.ndarray, axis: int = None, inclusive: bool = False) -> List[np.ndarray]:
     """Returns zero crossings of array"""
     # X = ordering_N_lead(X)
     if X.ndim == 1:
@@ -202,9 +202,15 @@ def zero_crossings(X: np.ndarray, axis: int = None) -> List[np.ndarray]:
         nonzero_diff = (np.abs(np.diff(signs,prepend=signs[0])) == 2)
 
         diff = zero_diff + nonzero_diff
-        return np.where(diff)[0]
+        crossings = np.where(diff)[0]
+        if inclusive:
+            crossings = np.concatenate(([0],crossings,[X.shape[0]]))
+        return crossings
     elif X.ndim == 2:
-        return [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])))[0] for j in range(X.shape[1])]
+        crossings = [np.where(np.diff(np.sign(X[:,j]),prepend=np.sign(X[0,j])))[0] for j in range(X.shape[1])]
+        if inclusive:
+            crossings = [np.concatenate(([0],c,[X.shape[0]])) for c in crossings]
+        return crossings
     else:
         raise NotImplementedError("zero_crossings function not implemented for arrays larger than 2D")
 
