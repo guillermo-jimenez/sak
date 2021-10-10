@@ -13,11 +13,13 @@ def segmentation(
         x: np.ndarray, 
         y: np.ndarray, 
         color_onset: int = 30,
+        alpha: float = 0.2,
+        returns: bool = False,
         **kwargs: dict
     ) -> Tuple[Figure, np.ndarray]:
 
     # Check inputs
-    if (len(x.shape) != 2) or (len(y.shape) not in [2,3]):
+    if (x.ndim != 2) or (y.ndim not in [2,3]):
         raise ValueError("Supposed to work with 2D images (grayscale)")
 
     if x.shape == y.shape:
@@ -28,7 +30,7 @@ def segmentation(
 
     # Obtain mask
     mask = y*np.arange(1,y.shape[0]+1)[:,None,None]
-    mask = mask.max(axis=0)
+    mask = mask.max(axis=0).astype(int)
 
     # Obtain grid
     grid_X,grid_Y = np.meshgrid(np.arange(x.shape[1]),np.arange(x.shape[0]))
@@ -39,5 +41,7 @@ def segmentation(
 
     # Plot image in axis
     ax.imshow(x,cmap='gray')
-    ax.contourf(grid_X,grid_Y,mask,unique_elements,colors=colors,alpha=0.2)
+    ax.contourf(grid_X,grid_Y,mask,unique_elements,colors=colors,alpha=alpha)
 
+    if returns:
+        return f,ax
