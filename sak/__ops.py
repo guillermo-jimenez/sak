@@ -423,6 +423,19 @@ def pairwise(iterator,n=2):
             next(iterators[i],None)
     return zip(*iterators)
 
+def find_nested(dictionary, key, value):
+    """https://stackoverflow.com/a/9808122/5211988"""
+    for k, v in dictionary.items() if isinstance(dictionary, dict) else enumerate(dictionary) if isinstance(dictionary, list) else []:
+        if (k == key) and (v == value):
+            yield dictionary
+        elif isinstance(v, dict):
+            for result in find_nested(v, key,value):
+                yield result
+        elif isinstance(v, list):
+            for d in v:
+                for result in find_nested(d, key, value):
+                    yield result
+
 def splitrfe(path: str) -> Tuple[str,str,str]:
     """Split a pathname. Returns tuple "(root, filename, extension)", where "filename" is
 everything after the final slash and before the final dot and "extension" is everything after the final dot. Either part may be empty."""
