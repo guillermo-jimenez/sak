@@ -37,9 +37,8 @@ def do_epoch(model: torch.nn.Module, state: dict, config: dict,
         data_post = sak.from_dict(config["data_post"])
 
     # Select iterator decorator
-    train_type = 'Train' if model.training else 'Valid'
-    iterator = sak.get_tqdm(dataloader, config['iterator'], 
-                            desc="({}) Epoch {:>3d}/{:>3d}, Loss {:0.3f}".format(train_type, 
+    iterator = sak.get_tqdm(dataloader, config.get('iterator',''), 
+                            desc="({}) Epoch {:>3d}/{:>3d}, Loss {:0.3f}".format('Train' if model.training else 'Valid', 
                                                                                  state['epoch']+1, 
                                                                                  config['epochs'], np.inf))
 

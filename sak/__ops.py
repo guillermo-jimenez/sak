@@ -358,7 +358,6 @@ def get_tqdm(iterator: iter, type: str = "tqdm.tqdm", **kwargs) -> Any:
     try:
         iterator = class_selector(type)(iterator, **kwargs)
     except:
-        print("valid tqdm not found, inputted: {}. continuing...".format(iterator))
         iterator = iterator
 
     return iterator
