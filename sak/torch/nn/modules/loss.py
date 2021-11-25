@@ -196,6 +196,14 @@ class KLDivergence:
         # Implemented mean reduced KL divergence for consistency.
         return self.reduction(torch.exp(logvar) + mu**2 - 1. - logvar)
 
+class KLDivNonLogLoss:
+    def __init__(self, **kwargs):
+        self.loss = torch.nn.KLDivLoss(**kwargs)
+        super().__init__()
+
+    def __call__(self, input: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        return self.loss(input.log(),target)
+
 class DiceLoss(torch.nn.Module):
     def __init__(self, reduction: str = 'mean', eps: float = 1e-6, weight: torch.Tensor = None):
         # Epsilon (division by zero)
@@ -240,7 +248,7 @@ class DiceLoss(torch.nn.Module):
         union = union.sum(-1)
         
         # Compute loss
-        loss = 1 - 2.*(intersection + self.eps)/(union + self.eps)
+        loss = 1 - 2.*(intersection+self.eps)/(union+2*self.eps)
 
         # Apply sample weight to samples
         if sample_weight is not None:
