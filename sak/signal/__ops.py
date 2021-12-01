@@ -1,5 +1,7 @@
 from typing import List, Tuple, Iterable, Callable
 import numpy as np
+import scipy as sp
+import scipy.fftpack
 from skimage.util import view_as_windows
 
 StandardHeader = np.array(['I', 'II', 'III', 'AVR', 'AVL', 'AVF', 'V1', 'V2', 'V3', 'V4', 'V5', 'V6'])
