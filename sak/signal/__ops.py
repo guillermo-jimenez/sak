@@ -356,3 +356,14 @@ def __xcorr_matrix(matrix, normed, maxlags):
 
     # Use valid mask to skip columns and have the final output
     return out, lags
+
+def approx_N_cycles(x):
+    """http://scipy-lectures.org/intro/scipy/auto_examples/solutions/plot_periodicity_finder.html"""
+    # Get estimate of number of waves
+    ft_x = sp.fftpack.fft(x, axis=0)[1:]
+    frequencies = sp.fftpack.fftfreq(x.shape[0])[1:]
+    periods = 1 / frequencies
+    cycles = int(np.round(x.size/periods[np.argmax(abs(ft_x))]))
+    
+    return cycles
+

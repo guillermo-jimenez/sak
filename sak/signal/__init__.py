@@ -25,5 +25,6 @@ from .__ops import is_max
 from .__ops import is_min
 from .__ops import extrema
 from .__ops import xcorr
+from .__ops import approx_N_cycles
 from .wavelet.__ops import find_peaks
 from .__ops import StandardHeader
