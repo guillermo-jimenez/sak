@@ -1,3 +1,10 @@
+# Import in correct order to avoid crash caused by torch:
+# "ImportError: dlopen: cannot load any more object with static TLS"
+import cv2
+import sklearn
+import skimage
+import torch
+
 from .__ops import as_tuple
 from .__ops import channel2index
 from .__ops import class_selector
@@ -25,4 +32,4 @@ import sak.image
 import sak.signal
 import sak.visualization
 
-__version__ = "0.0.2.35"
+__version__ = "0.0.2.36"
