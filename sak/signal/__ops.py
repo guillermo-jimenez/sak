@@ -337,20 +337,28 @@ def __xcorr_matrix(matrix, normed, maxlags):
         
     # Retrieve shape
     n,s = matrix.shape
+    if maxlags is None:
+        maxlags = s-1
+    if maxlags >= s or maxlags < 0:
+        raise ValueError('maglags must be None or strictly '
+                         'positive < %d' % s)
 
     # Pad input
-    matrix_padded = np.pad(matrix,((0,0),(s-1,s-1)),constant_values=0)
-    matrix_padded = view_as_windows(matrix_padded,(1,matrix.shape[-1],)).squeeze()
+    matrix_padded = np.pad(matrix,((0,0),(s,s)),constant_values=0)
+    matrix_padded = view_as_windows(matrix_padded,(1,s,)).squeeze()
 
-    lags = np.arange(-matrix.shape[-1]+1,matrix.shape[-1])
-    if maxlags and (maxlags < matrix.shape[-1]) and (maxlags > 0):
-        filt = (lags > -maxlags+1) & (lags < maxlags)
+    lags = np.arange(-s,s+1)
+    if (maxlags < matrix.shape[-1]) and (maxlags > 0):
+        filt = (lags >= -maxlags) & (lags <= maxlags)
         lags = lags[filt]
         matrix_padded = matrix_padded[:,filt,:]
-        
+    if maxlags == 0:
+        filt = (lags == 0)
+        matrix_padded = matrix_padded[:,filt,:]
+
     # Elementwise multiplications across all elements in axis=0, 
     # and then summation along axis=1
-    out = np.einsum('ijkl,ijkl->ijk',matrix_padded[None,:,:,:],matrix_padded[:,None,:,:])
+    out = np.einsum('ijkl,ijkl->ijk',matrix[None,:,None,:],matrix_padded[:,None,:,:])
     if normed:
         norm_x = np.einsum('ijk,ijk->ij',matrix[:,None,:],matrix[:,None,:])
         norm = np.sqrt(norm_x*norm_x.T)+np.finfo(matrix.dtype).eps
