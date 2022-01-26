@@ -22,29 +22,6 @@ class none(object):
         return args
 
 
-class RandomChoice(torchvision.transforms.transforms.RandomTransforms):
-    """Apply single transformation randomly picked from a list. This transform does not support torchscript."""
-
-    def __init__(self, transforms, p=None):
-        super().__init__(transforms)
-        if p is not None and not isinstance(p, Sequence):
-            raise TypeError("Argument p should be a sequence")
-        self.p = p
-
-    def __call__(self, x: torch.Tensor) -> torch.Tensor:
-        bs = x.shape[0]
-        tr = random.choices(self.transforms, weights=self.p, k=bs)
-        y  = x.clone()
-        for i in range(bs):
-            y[i] = tr[i](x[i,None,])[0]
-        return y
-
-    def __repr__(self):
-        format_string = super().__repr__()
-        format_string += f"(p={self.p})"
-        return format_string
-
-
 class AugmentationComposer(object):
     """Compose a random transform according to pre-specified config file"""
 
@@ -177,22 +154,40 @@ class RandomApply(torch.nn.Module):
         return format_string
 
 
-class RandomChoice(RandomTransforms):
-    """Apply single transformation randomly picked from a list. This transform does not support torchscript.
-    """
-    def __call__(self, *args):
-        t = random.choice(self.transforms)
-        return t(*args)
+class RandomChoice(torchvision.transforms.transforms.RandomTransforms):
+    """Apply single transformation randomly picked from a list. This transform does not support torchscript."""
+
+    def __init__(self, transforms, p=None):
+        super().__init__(transforms)
+        if p is not None and not isinstance(p, Sequence):
+            raise TypeError("Argument p should be a sequence")
+        self.p = p
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        bs = x.shape[0]
+        tr = random.choices(self.transforms, weights=self.p, k=bs)
+        y  = torch.empty_like(x)
+        for i in range(bs):
+            y[i] = tr[i](x[i,None,])[0]
+        return y
+
+    def __repr__(self):
+        format_string = super().__repr__()
+        format_string += f"(p={self.p})"
+        return format_string
 
 
 class RandomOrder(RandomTransforms):
     """Apply a list of transformations in a random order. This transform does not support torchscript.
     """
-    def __call__(self, *img):
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        bs = x.shape[0]
         order = list(range(len(self.transforms)))
-        random.shuffle(order)
-        for i in order:
-            img = self.transforms[i](*img)
-        return img
+        y = torch.empty_like(x)
+        for i in range(bs):
+            random.shuffle(order)
+            for j in order:
+                y[i] = self.transforms[j](x[i,None,])[0]
+        return y
 
 
