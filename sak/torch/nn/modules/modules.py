@@ -407,7 +407,8 @@ class EfficientChannelAttentionNd(Module):
         y = self.avg_pool(x)
         y_shape = y.shape
         # Squeeze the tensor
-        y = y.squeeze()[...,None]
+        if y_shape[0] == 1: y = y.squeeze()[None,...,None]
+        else:               y = y.squeeze()[...,None]
         # Transpose the tensor
         y = y.transpose(-1,-2)
         # Two different branches of ECA module
