@@ -22,6 +22,29 @@ class none(object):
         return args
 
 
+class RandomChoice(torchvision.transforms.transforms.RandomTransforms):
+    """Apply single transformation randomly picked from a list. This transform does not support torchscript."""
+
+    def __init__(self, transforms, p=None):
+        super().__init__(transforms)
+        if p is not None and not isinstance(p, Sequence):
+            raise TypeError("Argument p should be a sequence")
+        self.p = p
+
+    def __call__(self, x: torch.Tensor) -> torch.Tensor:
+        bs = x.shape[0]
+        tr = random.choices(self.transforms, weights=self.p, k=bs)
+        y  = x.clone()
+        for i in range(bs):
+            y[i] = tr[i](x[i,None,])[0]
+        return y
+
+    def __repr__(self):
+        format_string = super().__repr__()
+        format_string += f"(p={self.p})"
+        return format_string
+
+
 class AugmentationComposer(object):
     """Compose a random transform according to pre-specified config file"""
 
