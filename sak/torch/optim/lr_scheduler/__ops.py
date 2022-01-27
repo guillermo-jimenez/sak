@@ -6,6 +6,7 @@ import torch.optim.lr_scheduler
 class CosineWithWarmupLR(torch.optim.lr_scheduler._LRScheduler):
     def __init__(self, optimizer: torch.optim.Optimizer, num_warmup_steps: int, num_training_steps: int, 
                        num_wait_steps: int = 0, num_cycles: float = 0.5, last_epoch: int = -1):
+        """Adapted from https://github.com/kekmodel/MPL-pytorch"""
         self.optimizer          = optimizer
         self.num_warmup_steps   = num_warmup_steps
         self.num_training_steps = num_training_steps
