@@ -8,7 +8,7 @@ from .modules.loss import   CompoundLoss,                       XCorrLoss,      
                             SensibilityLoss1dIntersection,      SensibilityLoss2dIntersection,      PrecisionLoss1dIntersection, \
                             PrecisionLoss2dIntersection,        KLDivNonLogLoss
 from .modules.models import CNN,                                DNN,                                DCC, \
-                            Residual,                           SelfAttention
+                            Residual,                           SelfAttention,                      EMA
 from .modules.modules import ImagePooling1d,                    ImagePooling2d,                     ImagePooling3d, \
                              PointwiseConv1d,                   PointwiseConv2d,                    PointwiseConv3d, \
                              DepthwiseConv1d,                   DepthwiseConv2d,                    DepthwiseConv3d, \
