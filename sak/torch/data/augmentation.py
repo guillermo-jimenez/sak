@@ -3,6 +3,7 @@ import torch
 import torch.nn
 import random
 import torchvision.transforms
+import numpy as np
 
 from collections.abc import Sequence
 
@@ -154,7 +155,7 @@ class RandomApply(torch.nn.Module):
         return format_string
 
 
-class RandomChoice(torchvision.transforms.transforms.RandomTransforms):
+class RandomChoice(RandomTransforms):
     """Apply single transformation randomly picked from a list. This transform does not support torchscript."""
 
     def __init__(self, transforms, p=None):
@@ -190,4 +191,84 @@ class RandomOrder(RandomTransforms):
                 y[i] = self.transforms[j](x[i,None,])[0]
         return y
 
+
+class CutMix:
+    """Apply adapted CutMix (https://github.com/clovaai/CutMix-PyTorch/blob/master/train.py)
+    """
+    def __init__(self, beta: float):
+        self.beta = beta
+        
+    def __call__(self, *args: List[torch.Tensor]) -> List[torch.Tensor]:
+        # Check inputs
+        for i,elem_i in enumerate(args):
+            assert isinstance(elem_i, torch.Tensor), "Non-tensor inputs provided"
+            for j,elem_j in enumerate(args):
+                if i == j: continue
+                assert elem_i.shape[2:] == elem_j.shape[2:], "The shapes of the input tensors do not coincide"
+        bs   = np.unique([v.shape[0] for v in args])
+        ndim = np.unique([v.ndim     for v in args])
+        assert   bs.size == 1, "The batch size is inconsistent"
+        assert ndim.size == 1, "Number of dimensions are inconsistent"
+        bs,ndim = bs[0],ndim[0]
+
+        # If single batch size, nothing can be done
+        if bs == 1:
+            return args
+        
+        # Get beta value
+        lmbda = np.random.beta(self.beta,self.beta)
+        
+        # Match source and destination
+        match = np.random.permutation(np.arange(bs))
+        zip_match = zip(match[:match.size//2],match[match.size//2:])
+
+        # Iterate over matches
+        outputs = []
+        for i,elem in enumerate(args):
+            outputs.append(elem.clone())
+        for src,dst in zip_match:
+            # Generate bounding box per match
+            bbox = self.__rand_bbox(args[0].shape, lmbda)
+
+            # Apply bounding box to all input tensors
+            # TO DO - IMPROVE
+            for i,elem in enumerate(args):
+                if   len(bbox) == 1:
+                    ((x1,y1),)                                  = bbox
+                    tmp_src,tmp_dst                             = elem[src,:,x1:y1],elem[dst,:,x1:y1]
+                    outputs[i][dst,:,x1:y1]                     = tmp_src
+                    outputs[i][src,:,x1:y1]                     = tmp_dst
+                elif len(bbox) == 2:
+                    ((x1,y1),(x2,y2),)                          = bbox
+                    tmp_src,tmp_dst                             = elem[src,:,x1:y1,x2:y2],elem[dst,:,x1:y1,x2:y2]
+                    outputs[i][dst,:,x1:y1,x2:y2]               = tmp_src
+                    outputs[i][src,:,x1:y1,x2:y2]               = tmp_dst
+                elif len(bbox) == 3:
+                    ((x1,y1),(x2,y2),(x3,y3),)                  = bbox
+                    tmp_src,tmp_dst                             = elem[src,:,x1:y1,x2:y2,x3:y3],elem[dst,:,x1:y1,x2:y2,x3:y3]
+                    outputs[i][dst,:,x1:y1,x2:y2,x3:y3]         = tmp_src
+                    outputs[i][src,:,x1:y1,x2:y2,x3:y3]         = tmp_dst
+                elif len(bbox) == 4:
+                    ((x1,y1),(x2,y2),(x3,y3),(x4,y4))           = bbox
+                    tmp_src,tmp_dst                             = elem[src,:,x1:y1,x2:y2,x3:y3,x4:y4],elem[dst,:,x1:y1,x2:y2,x3:y3,x4:y4]
+                    outputs[i][dst,:,x1:y1,x2:y2,x3:y3,x4:y4]   = tmp_src
+                    outputs[i][src,:,x1:y1,x2:y2,x3:y3,x4:y4]   = tmp_dst
+                else: 
+                    raise NotImplementedError("Not implemented for tensors of dimension larger than 4")
+
+        return outputs
+
+    def __rand_bbox(self, shape: List[int], lmbda: float) -> np.ndarray:
+        bbox = []
+        cut_ratio = np.sqrt(1. - lmbda)
+        for size in shape[2:]:
+            # Define cut size
+            cut_size = int(size*cut_ratio)
+
+            # Randomly define the location
+            loc = np.random.randint(size)
+
+            bbox.append((np.clip(loc-cut_size//2,0,size),np.clip(loc+cut_size//2,0,size)))
+
+        return np.array(bbox)
 
