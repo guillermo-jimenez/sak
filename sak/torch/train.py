@@ -125,7 +125,7 @@ def train_model(model, state: dict, config: dict, loader: torch.utils.data.DataL
             model = model.cpu().eval()
             torch.save(model,              os.path.join(config[str_savedir],'checkpoint.model'),      pickle_module=dill)
             torch.save(model.state_dict(), os.path.join(config[str_savedir],'checkpoint.state_dict'), pickle_module=dill)
-            sak.pickledump(state, os.path.join(config[str_savedir],'checkpoint.state'), mode='wb')
+            sak.pickledump(state,          os.path.join(config[str_savedir],'checkpoint.state'),      mode='wb')
             model = model.to(state['device'])
             
             # Log train loss
@@ -139,19 +139,20 @@ def train_model(model, state: dict, config: dict, loader: torch.utils.data.DataL
                 state['best_epoch'] = epoch
                 
                 # Copy checkpoint and mark as best
-                shutil.copyfile(os.path.join(config[str_savedir],'checkpoint.model'), os.path.join(config[str_savedir],'model_best.model'))
-                shutil.copyfile(os.path.join(config[str_savedir],'checkpoint.state'), os.path.join(config[str_savedir],'model_best.state'))
+                shutil.copyfile(os.path.join(config[str_savedir],'checkpoint.model'),      os.path.join(config[str_savedir],'model_best.model'))
+                shutil.copyfile(os.path.join(config[str_savedir],'checkpoint.state_dict'), os.path.join(config[str_savedir],'model_best.state_dict'))
+                shutil.copyfile(os.path.join(config[str_savedir],'checkpoint.state'),      os.path.join(config[str_savedir],'model_best.state'))
         except KeyboardInterrupt:
             model = model.cpu().eval()
             torch.save(model,              os.path.join(config[str_savedir],'keyboard_interrupt.model'),      pickle_module=dill)
             torch.save(model.state_dict(), os.path.join(config[str_savedir],'keyboard_interrupt.state_dict'), pickle_module=dill)
-            sak.pickledump(state, os.path.join(config[str_savedir],'keyboard_interrupt.state'), mode='wb')
+            sak.pickledump(state,          os.path.join(config[str_savedir],'keyboard_interrupt.state'),      mode='wb')
             raise
         except:
             model = model.cpu().eval()
             torch.save(model,              os.path.join(config[str_savedir],'error.model'),      pickle_module=dill)
             torch.save(model.state_dict(), os.path.join(config[str_savedir],'error.state_dict'), pickle_module=dill)
-            sak.pickledump(state, os.path.join(config[str_savedir],'error.state'), mode='wb')
+            sak.pickledump(state,          os.path.join(config[str_savedir],'error.state'),      mode='wb')
             raise
 
 
