@@ -10,6 +10,8 @@ from .modules.loss import   CompoundLoss,                       XCorrLoss,      
 from .modules.models import CNN,                                DNN,                                DCC, \
                             Residual,                           SelfAttention,                      EMA
 from .modules.modules import ImagePooling1d,                    ImagePooling2d,                     ImagePooling3d, \
+                             LayerNorm1d,                       LayerNorm2d,                        LayerNorm3d, \
+                             ConvNeXtBlock1d,                   ConvNeXtBlock2d,                    ConvNeXtBlock3d, \
                              PointwiseConv1d,                   PointwiseConv2d,                    PointwiseConv3d, \
                              DepthwiseConv1d,                   DepthwiseConv2d,                    DepthwiseConv3d, \
                              SeparableConv1d,                   SeparableConv2d,                    SeparableConv3d, \

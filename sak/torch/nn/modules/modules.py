@@ -1,5 +1,7 @@
+import torch
 from torch import Tensor
 from torch import exp
+from torch import ones
 from torch import ones_like
 from torch import log
 from torch.nn import Module
@@ -22,14 +24,18 @@ from torch.nn import AdaptiveAvgPool3d
 from torch.nn import Linear
 from torch.nn import Sigmoid
 from torch.nn import ReLU
+from torch.nn import LayerNorm
 
 from torch.nn import init
+
+from timm.models.layers import DropPath
 
 from torch.nn.functional import interpolate
 from sak.torch.nn.modules.utils import Concatenate
 from .composers import Sequential
 from .composers import Parallel
 from sak import class_selector
+from sak import from_dict
 from sak.__ops import required
 from sak.__ops import check_required
 
@@ -82,6 +88,105 @@ class ImagePooling3d(ImagePoolingNd):
         super(ImagePooling3d, self).__init__(in_channels, out_channels, dim=3)
 
 
+class ConvNeXtBlockNd(Module):
+    def __init__(self, in_channels: int = required, hidden_channels: int = None, gamma_init: float = 1e-6, 
+                 drop_proba: float = 0., dim: int = required, **kwargs: dict):
+        super(ConvNeXtBlockNd, self).__init__()
+        # Check required inputs
+        check_required(self, {"in_channels":in_channels, "dim":dim})
+        hidden_channels = hidden_channels or 4*in_channels
+
+        # Establish default inputs
+        kwargs["groups"] = in_channels
+        kwargs["kernel_size"] = kwargs.get("kernel_size",7)
+        kwargs["padding"] = kwargs.get("padding", (kwargs["kernel_size"]-1)//2)
+        kwargs["initializer"] = kwargs.get("initializer", "timm.models.layers.trunc_normal_")
+        activation = kwargs.pop("activation",{"class": "torch.nn.GELU", "arguments": {}})
+
+        # Declare operations
+        if   dim == 1: 
+            self.depthwise_conv = DepthwiseConv1d(in_channels, **kwargs)
+            self.permute_in, self.permute_out = [0,2,1],     [0,2,1]
+        elif dim == 2: 
+            self.depthwise_conv = DepthwiseConv2d(in_channels, **kwargs)
+            self.permute_in, self.permute_out = [0,2,3,1],   [0,3,1,2]
+        elif dim == 3: 
+            self.depthwise_conv = DepthwiseConv3d(in_channels, **kwargs)
+            self.permute_in, self.permute_out = [0,2,3,4,1], [0,4,1,2,3]
+        else: raise ValueError("Invalid number of dimensions: {}".format(dim))
+        self.normalization    = LayerNorm(in_channels,eps=1e-6)
+        self.pointwise_conv_1 = Linear(in_channels, hidden_channels)
+        self.activation       = from_dict(activation)
+        self.pointwise_conv_2 = Linear(hidden_channels, in_channels)
+        self.gamma            = Parameter(gamma_init * ones((in_channels,)), requires_grad=True) if gamma_init > 0 else None
+        self.drop_path        = DropPath(drop_proba) if drop_proba > 0. else lambda x: x
+        
+        # Initialize weights values
+        initializer = class_selector(kwargs["initializer"])
+        initializer(self.pointwise_conv_1.weight)
+        initializer(self.pointwise_conv_2.weight)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x_prev = x
+        x = self.depthwise_conv(x)
+        x = x.permute(*self.permute_in) # (N, C, ...) -> (N, ..., C)
+        x = self.normalization(x)
+        x = self.pointwise_conv_1(x)
+        x = self.activation(x)
+        x = self.pointwise_conv_2(x)
+        if self.gamma is not None:
+            x = self.gamma * x
+        x = x.permute(*self.permute_out) # (N, ..., C) -> (N, C, ...)
+        return x_prev + self.drop_path(x) # Residual
+
+class ConvNeXtBlock1d(ConvNeXtBlockNd):
+    def __init__(self, in_channels: int = required, gamma_init: float = 1e-6, drop_path: float = 0., **kwargs):
+        super(ConvNeXtBlock1d, self).__init__(in_channels, gamma_init, drop_path, dim=1, **kwargs)
+
+class ConvNeXtBlock2d(ConvNeXtBlockNd):
+    def __init__(self, in_channels: int = required, gamma_init: float = 1e-6, drop_path: float = 0., **kwargs):
+        super(ConvNeXtBlock2d, self).__init__(in_channels, gamma_init, drop_path, dim=2, **kwargs)
+
+class ConvNeXtBlock3d(ConvNeXtBlockNd):
+    def __init__(self, in_channels: int = required, gamma_init: float = 1e-6, drop_path: float = 0., **kwargs):
+        super(ConvNeXtBlock3d, self).__init__(in_channels, gamma_init, drop_path, dim=3, **kwargs)
+
+
+class LayerNormNd(torch.nn.LayerNorm):
+    r""" LayerNorm for channels_first tensors with 2d spatial dimensions (ie N, C, H, W).
+    """
+
+    def __init__(self, normalized_shape: Union[int, List[int], torch.Size], dim: int = required, **kwargs):
+        kwargs["eps"] = kwargs.get("eps",1e-6) # Fix epsilon
+        super().__init__(normalized_shape, **kwargs)
+        if   dim == 1: self.permute_in,self.permute_out = [0,2,1],     [0,2,1]
+        elif dim == 2: self.permute_in,self.permute_out = [0,2,3,1],   [0,3,1,2]
+        elif dim == 3: self.permute_in,self.permute_out = [0,2,3,4,1], [0,4,1,2,3]
+        else: raise ValueError("Invalid number of dimensions: {}".format(dim))
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        if x.is_contiguous():
+            return F.layer_norm(
+                x.permute(*self.permute_in), self.normalized_shape, self.weight, self.bias, self.eps).permute(*self.permute_in)
+        else:
+            s, u = torch.var_mean(x, dim=1, unbiased=False, keepdim=True)
+            x = (x - u) * torch.rsqrt(s + self.eps)
+            x = x * self.weight[:, None, None] + self.bias[:, None, None]
+            return x
+        
+class LayerNorm1d(LayerNormNd):
+    def __init__(self, normalized_shape: Union[int, List[int], torch.Size], **kwargs):
+        super().__init__(normalized_shape, dim=1, **kwargs)
+
+class LayerNorm2d(LayerNormNd):
+    def __init__(self, normalized_shape: Union[int, List[int], torch.Size], **kwargs):
+        super().__init__(normalized_shape, dim=2, **kwargs)
+
+class LayerNorm3d(LayerNormNd):
+    def __init__(self, normalized_shape: Union[int, List[int], torch.Size], **kwargs):
+        super().__init__(normalized_shape, dim=3, **kwargs)
+
+
 class PointwiseConvNd(Module):
     def __init__(self, in_channels: int = required, out_channels: int = required, dim: int = required, **kwargs: dict):
         super(PointwiseConvNd, self).__init__()
@@ -92,6 +197,7 @@ class PointwiseConvNd(Module):
         kwargs["groups"] = 1
         kwargs["kernel_size"] = 1
         kwargs["padding"] = 0
+        initializer = kwargs.pop("initializer","timm.models.layers.trunc_normal_")
 
         # Declare operations
         if   dim == 1: self.pointwise_conv = Conv1d(in_channels, out_channels, **kwargs)
@@ -100,7 +206,7 @@ class PointwiseConvNd(Module):
         else: raise ValueError("Invalid number of dimensions: {}".format(dim))
 
         # Initialize weights values
-        initializer = class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
+        initializer = class_selector(initializer)
         initializer(self.pointwise_conv.weight)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -128,8 +234,8 @@ class DepthwiseConvNd(Module):
         # Establish default inputs
         kwargs["groups"] = in_channels
         kwargs["padding"] = kwargs.get("padding", (kernel_size-1)//2)
-        if "out_channels" in kwargs:
-            kwargs.pop("out_channels")
+        kwargs.pop("out_channels",None)
+        initializer = kwargs.pop("initializer","timm.models.layers.trunc_normal_")
 
         # Declare operations
         if   dim == 1: self.depthwise_conv = Conv1d(in_channels, in_channels, kernel_size, **kwargs)
@@ -138,7 +244,7 @@ class DepthwiseConvNd(Module):
         else: raise ValueError("Invalid number of dimensions: {}".format(dim))
 
         # Initialize weights values
-        initializer = class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
+        initializer = class_selector(initializer)
         initializer(self.depthwise_conv.weight)
         
     def forward(self, x: Tensor) -> Tensor:
@@ -204,6 +310,7 @@ class PointwiseConvTransposeNd(Module):
         kwargs["groups"] = 1
         kwargs["kernel_size"] = 1
         kwargs["padding"] = 0
+        initializer = kwargs.pop("initializer","timm.models.layers.trunc_normal_")
 
         # Declare operations
         if   dim == 1: self.pointwise_conv_transp = ConvTranspose1d(in_channels, out_channels, **kwargs)
@@ -212,7 +319,7 @@ class PointwiseConvTransposeNd(Module):
         else: raise ValueError("Invalid number of dimensions: {}".format(dim))
 
         # Initialize weights values
-        initializer = class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
+        initializer = class_selector(initializer)
         initializer(self.pointwise_conv_transp.weight)
 
     def forward(self, x: Tensor) -> Tensor:
@@ -240,8 +347,8 @@ class DepthwiseConvTransposeNd(Module):
         # Establish default inputs
         kwargs["groups"] = in_channels
         kwargs["padding"] = kwargs.get("padding", (kernel_size-1)//2)
-        if "out_channels" in kwargs:
-            kwargs.pop("out_channels")
+        kwargs.pop("out_channels",None)
+        initializer = kwargs.pop("initializer","timm.models.layers.trunc_normal_")
 
         # Declare operations
         if   dim == 1: self.depthwise_conv_transp = ConvTranspose1d(in_channels, in_channels, kernel_size, **kwargs)
@@ -250,7 +357,7 @@ class DepthwiseConvTransposeNd(Module):
         else: raise ValueError("Invalid number of dimensions: {}".format(dim))
         
         # Initialize weights values
-        initializer = class_selector(kwargs.get("initializer","torch.nn.init.xavier_normal_"))
+        initializer = class_selector(initializer)
         initializer(self.depthwise_conv_transp.weight)
         
     def forward(self, x: Tensor) -> Tensor:
