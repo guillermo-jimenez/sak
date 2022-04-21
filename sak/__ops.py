@@ -55,7 +55,7 @@ class Mapper:
                 raise ValueError(f"""invalid input configuration, inputs should either be a list of indices (e.g. [0,8]) 
                 or a nested list of dict keys (e.g. [['inputs', 'x_value'], ['outputs', 'y_value']]). Got {self.input_mappings} 
                 as input mappings and the offending input pair is {inputs}""")
-        
+        print(input_args)
         output = self.operation(*input_args)
         mark_return = False
 

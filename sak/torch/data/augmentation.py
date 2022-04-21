@@ -37,13 +37,14 @@ class AugmentationComposer(object):
             ops = []
             for transform in operation["transforms"]:
                 ops.append(self.__get_operation(transform))
-            return class_selector(operation["class"])(ops)
+            return sak.class_selector(operation["class"])(ops)
         else:
             if isinstance(operation["arguments"], list):
-                return class_selector(operation["class"])(*operation["arguments"])
+                return sak.class_selector(operation["class"])(*operation["arguments"])
             elif isinstance(operation["arguments"], dict):
-                return class_selector(operation["class"])(**operation["arguments"])
-
+                if "transforms" in operation["arguments"]:
+                    operation["arguments"]["transforms"] = [sak.from_dict(tr) for tr in operation["arguments"]["transforms"]]
+                return sak.class_selector(operation["class"])(**operation["arguments"])
 
 class Compose:
     """Composes several transforms together. This transform does not support torchscript.
@@ -133,17 +134,24 @@ class RandomApply(torch.nn.Module):
         p (float): probability
     """
 
-    def __init__(self, transforms, p=0.5):
+    def __init__(self, transforms, p=0.5, per_element: bool = True):
         super().__init__()
         self.transforms = transforms
         self.p = p
+        self.call = self.__per_element if self.per_element else self.__all
 
-    def forward(self, *img):
+    def forward(self, *x: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
+        return self.call(*x)
+
+    def __per_element(self, *x: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
+        raise NotImplementedError("Not yet implemented")
+
+    def __all(self, *x: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
         if self.p < torch.rand(1):
-            return img
+            return x
         for t in self.transforms:
-            img = t(*img)
-        return img
+            x = t(*x)
+        return x
 
     def __repr__(self):
         format_string = self.__class__.__name__ + '('
@@ -158,19 +166,36 @@ class RandomApply(torch.nn.Module):
 class RandomChoice(RandomTransforms):
     """Apply single transformation randomly picked from a list. This transform does not support torchscript."""
 
-    def __init__(self, transforms, p=None):
+    def __init__(self, transforms, p=None, per_element: bool = True):
         super().__init__(transforms)
         if p is not None and not isinstance(p, Sequence):
             raise TypeError("Argument p should be a sequence")
+        self.per_element = per_element
         self.p = p
+        self.call = self.__per_element if self.per_element else self.__all
 
-    def __call__(self, x: torch.Tensor) -> torch.Tensor:
-        bs = x.shape[0]
+    def __call__(self, *x: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
+        return self.call(*x)
+
+    def __per_element(self, *x: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
+        if len(x) < 1:
+            raise ValueError("Cannot take empty inputs")
+        else:
+            assert np.unique([t.shape[0] for t in x]).size == 1, "Batch sizes do not coincide, check inputs"
+        bs = x[0].shape[0]
         tr = random.choices(self.transforms, weights=self.p, k=bs)
-        y  = torch.empty_like(x)
+
+        y  = [torch.empty_like(t) for t in x]
         for i in range(bs):
-            y[i] = tr[i](x[i,None,])[0]
-        return y
+            sub_x = tuple([x[j][i,None,] for j in range(len(x))])
+            sub_out = tr[i](*sub_x)
+            for j in range(len(x)):
+                y[j][i] = sub_out[j][0]
+        return tuple(y)
+
+    def __all(self, *x: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
+        t = random.choice(self.transforms)
+        return t(*x)
 
     def __repr__(self):
         format_string = super().__repr__()
@@ -179,18 +204,42 @@ class RandomChoice(RandomTransforms):
 
 
 class RandomOrder(RandomTransforms):
-    """Apply a list of transformations in a random order. This transform does not support torchscript.
-    """
-    def __call__(self, x: torch.Tensor) -> torch.Tensor:
-        bs = x.shape[0]
+    """Apply a list of transformations in a random order. This transform does not support torchscript."""
+
+    def __init__(self, transforms, per_element: bool = True):
+        super().__init__(transforms)
+        self.per_element = per_element
+        self.call = self.__per_element if self.per_element else self.__all
+
+    def __call__(self, *x: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
+        return self.call(*x)
+
+    def __per_element(self, *x: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
+        if len(x) < 1:
+            raise ValueError("Cannot take empty inputs")
+        else:
+            assert np.unique([t.shape[0] for t in x]).size == 1, "Batch sizes do not coincide, check inputs"
+        bs = x[0].shape[0]
         order = list(range(len(self.transforms)))
-        y = torch.empty_like(x)
+        y  = [torch.empty_like(t) for t in x]
         for i in range(bs):
             random.shuffle(order)
+            sub_x = tuple([x[j][i,None,].clone() for j in range(len(x))])
             for j in order:
-                y[i] = self.transforms[j](x[i,None,])[0]
-        return y
+                # y[i] = (x[i,None,])[0]
+                sub_x = self.transforms[j](*sub_x)
+            # print(sub_x)
+            for j in range(len(x)):
+                y[j][i] = sub_x[j][0]
 
+        return tuple(y)
+
+    def __all(self, *x: Tuple[torch.Tensor]) -> Tuple[torch.Tensor]:
+        order = list(range(len(self.transforms)))
+        for j in order:
+            x = self.transforms[j](*x)
+        return x
+        
 
 class CutMix:
     """Apply adapted CutMix (https://github.com/clovaai/CutMix-PyTorch/blob/master/train.py)
