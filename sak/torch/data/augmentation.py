@@ -8,6 +8,7 @@ import numpy as np
 from collections.abc import Sequence
 
 # Check required arguments as keywords
+from sak.__ops import from_dict
 from sak.__ops import class_selector
 from sak.__ops import required
 from sak.__ops import check_required
@@ -37,14 +38,14 @@ class AugmentationComposer(object):
             ops = []
             for transform in operation["transforms"]:
                 ops.append(self.__get_operation(transform))
-            return sak.class_selector(operation["class"])(ops)
+            return class_selector(operation["class"])(ops)
         else:
             if isinstance(operation["arguments"], list):
-                return sak.class_selector(operation["class"])(*operation["arguments"])
+                return class_selector(operation["class"])(*operation["arguments"])
             elif isinstance(operation["arguments"], dict):
                 if "transforms" in operation["arguments"]:
-                    operation["arguments"]["transforms"] = [sak.from_dict(tr) for tr in operation["arguments"]["transforms"]]
-                return sak.class_selector(operation["class"])(**operation["arguments"])
+                    operation["arguments"]["transforms"] = [from_dict(tr) for tr in operation["arguments"]["transforms"]]
+                return class_selector(operation["class"])(**operation["arguments"])
 
 class Compose:
     """Composes several transforms together. This transform does not support torchscript.
