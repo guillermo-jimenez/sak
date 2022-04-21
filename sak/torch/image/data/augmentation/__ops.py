@@ -214,13 +214,22 @@ class AdjustGamma(object):
         # Output tensor
         out = torch.empty_like(x)
 
+        # Retrieve max scale
+        max_scale = x.max()
+        if   x.max() <= 1:
+            max_scale = 1
+        elif x.max() <= 255:
+            max_scale = 255
+        else:
+            raise NotImplementedError("Value not implemented yet")
+
         # Apply transformation to each element in the batch
         for i in range(x.shape[0]):
             x_i = x[i].permute([1,2,0]).numpy()
             g = max([self.gamma+np.random.randn()*self.noise,0])
             out[i] = torch.tensor(skimage.exposure.adjust_gamma(x_i, gamma=g)).permute([2,0,1])
 
-        return out
+        return out.clip(0,max_scale)
 
 
 class AffineTransform(object):
@@ -327,6 +336,8 @@ class SaltAndPepperNoise(object):
             max_scale = 1
         elif x.max() <= 255:
             max_scale = 255
+        else:
+            raise NotImplementedError("Value not implemented yet")
 
         # Perform operation
         for b in range(x.shape[0]):
@@ -401,9 +412,9 @@ class PrintCursors(object):
         
         # Avoid issues with max values
         if x.max() <= 1:
-            value = 1
+            max_scale = 1
         elif x.max() <= 255:
-            value = 255
+            max_scale = 255
         else:
             raise NotImplementedError("Value not implemented yet")
 
@@ -433,9 +444,9 @@ class PrintCursors(object):
                     x_space = x[b,c,loc_y-crosshair_width-n:loc_y+crosshair_width+n,
                                 loc_x-crosshair_width-n:loc_x+crosshair_width+n].copy()
                     x[b,c,loc_y-crosshair_width:loc_y+crosshair_width,
-                      loc_x-crosshair_length:loc_x+crosshair_length,] = value
+                      loc_x-crosshair_length:loc_x+crosshair_length,] = max_scale
                     x[b,c,loc_y-crosshair_length:loc_y+crosshair_length,
-                      loc_x-crosshair_width:loc_x+crosshair_width,] = value
+                      loc_x-crosshair_width:loc_x+crosshair_width,] = max_scale
 
                     if random.uniform(0,1) > (1-0.5):
                         x[b,c,loc_y-crosshair_width-n:loc_y+crosshair_width+n,
@@ -443,18 +454,18 @@ class PrintCursors(object):
 
                 for _ in range(N_vert):
                     loc_x = random.choice(unique_x) + random.randint(-5,5)
-                    x[b,c,:,loc_x-vertline_width:loc_x+vertline_width] = value
+                    x[b,c,:,loc_x-vertline_width:loc_x+vertline_width] = max_scale
 
                 for _ in range(N_horiz):
                     loc_y = random.choice(unique_y) + random.randint(-5,5)
                     dashes = sak.signal.pulse_train(W,horizline_spacing,random.randint(0,horizline_spacing)).astype(bool)
-                    x[b,c,loc_y-1:loc_y+1,dashes] = value
+                    x[b,c,loc_y-1:loc_y+1,dashes] = max_scale
 
                 if has_ruler_x:
                     for i,loc in enumerate(range(ruler_onset,W,ruler_spacing)):
-                        x[b,c,-int(ruler_width*(1.5**(i%random.choice([5,10,20])==0))):,loc-1:loc+1] = value
+                        x[b,c,-int(ruler_width*(1.5**(i%random.choice([5,10,20])==0))):,loc-1:loc+1] = max_scale
                 if has_ruler_x or has_ruler_y:
                     for i,loc in enumerate(range(ruler_onset,H,ruler_spacing)):
-                        x[b,c,loc-1:loc+1,-int(ruler_width*(1.5**(i%random.choice([5,10,20])==0))):] = value
+                        x[b,c,loc-1:loc+1,-int(ruler_width*(1.5**(i%random.choice([5,10,20])==0))):] = max_scale
         
         return torch.tensor(x)
