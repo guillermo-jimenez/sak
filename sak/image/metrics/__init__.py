@@ -7,3 +7,4 @@ from .__ops import precision
 from .__ops import recall
 from .__ops import f1_score
 from .__ops import get_boundaries
+from .__ops import dice

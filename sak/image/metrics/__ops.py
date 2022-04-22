@@ -118,4 +118,7 @@ def get_boundaries(mask: np.ndarray, mode: int = cv2.RETR_TREE, method: int = cv
         
     return output_contours
     
-    
+def dice(pred: np.ndarray, true: np.ndarray, k: int = 1) -> float:
+    intersection = np.sum(pred[true==k]) * 2.0
+    dice = intersection / (np.sum(pred) + np.sum(true))
+    return dice
