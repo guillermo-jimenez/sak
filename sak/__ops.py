@@ -29,19 +29,6 @@ required = _RequiredParameter()
 
 ################ ANY OTHER THING ################
 
-
-class Mapper:
-    def __init__(self, operation: Union[Dict, Callable], input_mappings: List = [], output_mappings: Dict = []):
-        if isinstance(operation, Callable):
-            self.operation = operation
-        elif isinstance(operation, Dict):
-            self.operation = from_dict(operation)
-        else:
-            raise ValueError("Required input 'operation' provided with invalid type {}".format(type(operation)))
-        self.input_mappings = input_mappings
-        self.output_mappings = output_mappings
-        
-    def __call__(self, *args, **kwargs):
 class Mapper:
     def __init__(self, operation: Union[Dict, Callable], input_mappings: List = [], output_mappings: Dict = []):
         if isinstance(operation, Callable):
