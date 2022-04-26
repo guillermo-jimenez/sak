@@ -9,6 +9,8 @@ import datetime
 import pickle
 import importlib
 import itertools
+import inspect
+import warnings
 from warnings import warn
 
 ################ DEFINE REQUIRED BEFORE ANYTHING ELSE ################
@@ -40,6 +42,120 @@ class Mapper:
         self.output_mappings = output_mappings
         
     def __call__(self, *args, **kwargs):
+class Mapper:
+    def __init__(self, operation: Union[Dict, Callable], input_mappings: List = [], output_mappings: Dict = []):
+        if isinstance(operation, Callable):
+            self.operation = operation
+        elif isinstance(operation, Dict):
+            self.operation = from_dict(operation)
+        else:
+            raise ValueError("Required input 'operation' provided with invalid type {}".format(type(operation)))
+        self.input_mappings = input_mappings
+        self.output_mappings = output_mappings
+        try:
+            self.signature = inspect.signature(self.operation.forward)
+            self.signature_order = {i: k for i,k in enumerate(list(self.signature.parameters.keys()))}
+        except AttributeError:
+            self.signature = inspect.signature(self.operation.__call__)
+            self.signature_order = {i: k for i,k in enumerate(list(self.signature.parameters.keys()))}
+        
+        mapping_version = (
+            [not isinstance(mapping,Dict) for mapping in self.input_mappings] + 
+            [not isinstance(mapping,Dict) for mapping in self.output_mappings]
+        )
+        if all(mapping_version):
+            warnings.warn("Passing input mappings as a list is deprecated and will be removed.")
+            self.__call_fcn = self.__call_legacy__
+        elif any (mapping_version):
+            raise ValueError(f"""This should not happen. Either comply with legacy (list of lists) or new (list of dicts) versions. Current inputs:
+            
+            input  mappings: {self.input_mappings}
+            output mappings: {self.output_mappings}""")
+        else:
+            self.__call_fcn = self.__call_new__
+
+    def __call__(self, *args, **kwargs):
+        return self.__call_fcn(*args,**kwargs)
+
+    def __call_new__(self, *args, **kwargs):
+        # Define kwargs for operation
+        op_kwargs = {}
+        in_mappings = None
+        for in_mappings in self.input_mappings:
+            if ("from" not in in_mappings) or ("to" not in in_mappings):
+                raise ValueError(f"""invalid input mapping definition. Input dictionary must contain a key 'from' and a key 'to', but got in_mappings {in_mappings}""")
+
+            # Correct mappings to map
+            if isinstance(in_mappings["to"], str):
+                pass
+            elif isinstance(in_mappings["to"], int):
+                in_mappings["to"] = self.signature_order[in_mappings["to"]]
+            else:
+                raise ValueError(f"""invalid 'to' input mapping definition: must be a string 'name_of_variable', an integer of the argument number (e.g. 1) or a dict {'{'}dic_name, key_name{'}'}. Got {in_mappings["to"]}, of type {type(in_mappings["to"])}""")
+
+            # Select input
+            if isinstance(in_mappings["from"], str):
+                assert in_mappings["from"] in kwargs, f"keyword {in_mappings['from']} not found in keyword arguments"
+                op_kwargs[in_mappings["to"]] = kwargs[in_mappings["from"]]
+            elif isinstance(in_mappings["from"], int):
+                op_kwargs[in_mappings["to"]] = args[in_mappings["from"]]
+            elif isinstance(in_mappings["from"], Dict):
+                assert len(in_mappings["from"]) == 1, f"when using a dict, input mappings should be {'{'}dict_name: key_name{'}'} with a single item, but a dict {in_mappings['from']} was found"
+                dic,key = next(iter(in_mappings["from"].items()))
+                op_kwargs[in_mappings["to"]] = kwargs[dic][key]
+            else:
+                raise ValueError(f"""invalid 'from' input mapping definition: must be a string 'name_of_variable', an integer of the argument number (e.g. 1) or a dict {'{'}dic_name, key_name{'}'}. Got {in_mappings["from"]}, of type {type(in_mappings["from"])}""")
+            
+        output = self.operation(**op_kwargs)
+        mark_return = False
+
+        # If no output specified, return as value
+        if len(self.output_mappings) == 0:
+            return output
+        # Otherwise, return in the specified dict (mutable object, modified in main script)
+        else:
+            # If the output is only a single element, output_mappings should match that single element
+            if (not isinstance(output, List)) and (not isinstance(output, Tuple)):
+                output = [output]
+
+            # Check size ouf output w.r.t. output mappings (should be the same)
+            assert len(self.output_mappings) == len(output), f"Mismatch between length of resulting operation. Output is length {len(output)}, while output mappings are {self.output_mappings}"
+
+            # If no mismatch, map each output mapping
+            out_args = None
+            for i,out_mappings in enumerate(self.output_mappings):
+                if ("from" not in out_mappings) or ("to" not in out_mappings):
+                    raise ValueError(f"""invalid output mapping definition. Input dictionary must contain a key 'from' and a key 'to', but got out_mappings {out_mappings}""")
+
+                # Correct mappings to map
+                if not isinstance(out_mappings["from"], int):
+                    raise ValueError(f"""invalid 'from' output mapping definition: must be an integer of the argument number (e.g. 1). Got {out_mappings["to"]}, of type {type(out_mappings["to"])}""")
+                if not isinstance(out_mappings["to"], (int,str,Dict)):
+                    raise ValueError(f"""invalid 'to' output mapping definition: must be an integer of the argument number (e.g. 1), a string for kwargs or a dict {'{'}dic_name, key_name{'}'} indicating a dict in kwargs. Got {out_mappings["to"]}, of type {type(out_mappings["to"])}""")
+                
+                # Get output value
+                value = output[out_mappings["from"]]
+
+                if isinstance(out_mappings["to"], str):
+                    kwargs[out_mappings["to"]] = value
+                elif isinstance(out_mappings["to"], int):
+                    if out_args is None:
+                        out_args = list(args)
+                    out_args[out_mappings["to"]] = value
+                elif isinstance(out_mappings["to"], Dict):
+                    assert len(out_mappings["to"]) == 1, f"when using a dict, output mappings should be {'{'}dict_name: key_name{'}'} with a single item, but a dict {out_mappings['to']} was found"
+                    dic,key = next(iter(out_mappings["to"].items()))
+                    kwargs[dic][key] = value
+                else:
+                    raise ValueError(f"""invalid 'to' output mapping definition: must be a string 'name_of_variable', an integer of the argument number (e.g. 1) or a dict {'{'}dic_name, key_name{'}'}. Got {out_mappings["to"]}, of type {type(out_mappings["to"])}""")
+
+            if not (out_args is None):
+                out_args = tuple(out_args)
+
+            return out_args
+
+    def __call_legacy__(self, *args, **kwargs):
+        """Deprecated"""
         # Check input and output types
         assert all([isinstance(kwargs[k], Dict) for k in kwargs]), "Inputs and outputs must be specified as dicts"
         
