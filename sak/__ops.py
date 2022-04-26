@@ -100,8 +100,8 @@ class Mapper:
                 raise ValueError(f"invalid 'from' input mapping definition: must be a string 'name_of_variable', an integer of the argument number (e.g. 1) or a dict {'{'}dic_name, key_name{'}'}. Got {in_mappings['from']}, of type {type(in_mappings['from'])}")
 
             # Store input
-            if (structure is op_args) and ((in_mappings["to"]-1) < len(op_args)):
-                for _ in range(len(op_args)-(in_mappings["to"]-1)):
+            if (structure is op_args) and (((in_mappings["to"]+1) - len(op_args)) > 0):
+                for _ in range((in_mappings["to"]+1) - len(op_args)):
                     structure.append(Empty)
             structure[in_mappings["to"]] = value
 
