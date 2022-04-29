@@ -18,25 +18,35 @@ def segmentation(
         **kwargs: dict
     ) -> Tuple[Figure, np.ndarray]:
 
-    # Check inputs
-    if (x.ndim != 2) or (y.ndim not in [2,3]):
-        raise ValueError("Supposed to work with 2D images (grayscale)")
+    # Preprocess inputs
+    if (x.ndim == 3) and (x.shape[-1] == 1):
+        x = np.squeeze(x,-1)
+    if (x.ndim not in [2,3]) or (y.ndim not in [2,3]):
+        raise ValueError("Supposed to work with 2D images (grayscale or RGB)")
 
-    if x.shape == y.shape:
+    # Get image shape
+    shape = x.shape[:-1] if x.ndim == 3 else x.shape
+
+    # Convert 3D mask into 2D
+    if y.ndim == 3:
+        y = np.moveaxis(y,2,0)
+    elif (y.ndim == 2) and (shape == y.shape):
         y = np.copy(y)[None,]
+    else:
+        raise ValueError("Input dimensions must match!")
 
     # Get figure and axis
     f,ax = get_fig_kwargs(**kwargs)
 
     # Obtain mask
     mask = y*np.arange(1,y.shape[0]+1)[:,None,None]
-    mask = mask.max(axis=0).astype(int)
+    mask = mask.sum(axis=0)
 
     # Obtain grid
     grid_X,grid_Y = np.meshgrid(np.arange(x.shape[1]),np.arange(x.shape[0]))
-    
+
     # Obtain unique mask elements
-    unique_elements = np.unique(y)+0.5
+    unique_elements = np.unique(mask)+0.5
     colors = list(mcolors.cnames)[color_onset:color_onset+unique_elements.size]
 
     # Plot image in axis
