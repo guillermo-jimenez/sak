@@ -275,27 +275,41 @@ def zero_crossing_areas(X: np.ndarray, axis: int = None, normalize: bool = False
     return areas
 
 
-def xcorr(x: np.ndarray, y: np.ndarray = None, normed: bool = True, maxlags: int = None) -> List[np.ndarray]:
-    # Cross correlation of two signals of equal length
-    # Returns the coefficients when normed=True
-    # Returns inner products when normed=False
-    # Usage: lags, c = xcorr(x,y,maxlags=len(x)-1)
-    # Optional detrending e.g. mlab.detrend_mean
+def xcorr(x: np.ndarray, y: np.ndarray = None, normed: bool = True, maxlags: int = None, elementwise: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+    """Cross correlation of two signals of equal length
+    Returns the coefficients when normed=True and inner products when normed=False
+
+    Usage: correlations, lags = sak.signal.xcorr(x,y, maxlags = 10, normed = True)"""
+
+    # Initial checks
+    if (x.ndim != 2):
+        raise ValueError("prepared for 2D inputs")
+    if (x.shape[0] < 1):
+        raise ValueError("Minimum of 2 samples needed")
+    if y is None:
+        y = x.copy()
+        if (y.ndim != 2):
+            raise ValueError("prepared for 2D inputs")
+    if x.shape[1] != y.shape[1]:
+        raise ValueError("Second dimension of x and y matrices must be the same")
 
     # Order dimensions of both vectors
-    if y is not None:
-        if (x.ndim == 2) or (y.ndim == 2):
-            return [__xcorr_single(x[:,j],y[:,j],normed,maxlags) for j in range(x.shape[1])]
-        else:
-            x = x.squeeze()
-            y = y.squeeze()
-            return __xcorr_single(x,y,normed,maxlags)
-    else:
-        return __xcorr_matrix(x, normed, maxlags)
+    # if y is not None:
+    #     if (x.ndim == 2) or (y.ndim == 2):
+    #         if elementwise:
+    #             return [__xcorr_single(x[:,j],y[:,j],normed,maxlags) for j in range(x.shape[1])]
+    #         else:
+    #             return __xcorr_matrix(x, y, normed=normed, maxlags=maxlags)
+    #     else:
+    #         x = x.squeeze()
+    #         y = y.squeeze()
+    #         return __xcorr_single(x, y, normed=normed, maxlags=maxlags)
+    # else:
+    return __xcorr_matrix(x, y, normed=normed, maxlags=maxlags)
 
 
 
-def __xcorr_single(x: np.ndarray, y: np.ndarray, normed: bool, maxlags: int) -> Tuple[np.ndarray, np.ndarray]:
+def __xcorr_single(x: np.ndarray, y: np.ndarray, normed: bool = True, maxlags: int = None) -> Tuple[np.ndarray, np.ndarray]:
     # Check dimensions
     assert x.shape[0] == y.shape[0], "The size of x and y must be the same"
 
@@ -328,15 +342,21 @@ def __xcorr_single(x: np.ndarray, y: np.ndarray, normed: bool, maxlags: int) -> 
     return c, lags
 
 
-def __xcorr_matrix(matrix, normed, maxlags):
+def __xcorr_matrix(x: np.ndarray, y: np.ndarray = None, normed: bool = True, maxlags: int = None) -> List[np.ndarray]:
     # Initial checks
-    if matrix.ndim != 2:
+    if (x.ndim != 2):
         raise ValueError("prepared for 2D inputs")
-    if matrix.shape[0] < 1:
+    if (x.shape[0] < 1):
         raise ValueError("Minimum of 2 samples needed")
-        
+    if y is None:
+        y = x.copy()
+        if (y.ndim != 2):
+            raise ValueError("prepared for 2D inputs")
+    if x.shape[1] != y.shape[1]:
+        raise ValueError("Second dimension of x and y matrices must be the same")
+
     # Retrieve shape
-    n,s = matrix.shape
+    _,s = x.shape
     if maxlags is None:
         maxlags = s-1
     if maxlags >= s or maxlags < 0:
@@ -344,24 +364,28 @@ def __xcorr_matrix(matrix, normed, maxlags):
                          'positive < %d' % s)
 
     # Pad input
-    matrix_padded = np.pad(matrix,((0,0),(s,s)),constant_values=0)
-    matrix_padded = view_as_windows(matrix_padded,(1,s,)).squeeze()
+    x_padded = np.pad(x,((0,0),(s,s)),constant_values=0)
+    x_padded = view_as_windows(x_padded,(1,s,)).squeeze()
 
     lags = np.arange(-s,s+1)
-    if (maxlags < matrix.shape[-1]) and (maxlags > 0):
+    if (maxlags < x.shape[-1]) and (maxlags > 0):
         filt = (lags >= -maxlags) & (lags <= maxlags)
         lags = lags[filt]
-        matrix_padded = matrix_padded[:,filt,:]
-    if maxlags == 0:
+    elif maxlags == 0:
         filt = (lags == 0)
-        matrix_padded = matrix_padded[:,filt,:]
+    else:
+        raise ValueError("Incompatible maxlags argument")
+
+    # Filter out just the windows to be compared
+    x_padded = x_padded[:,filt,:]
 
     # Elementwise multiplications across all elements in axis=0, 
     # and then summation along axis=1
-    out = np.einsum('ijkl,ijkl->ijk',matrix[None,:,None,:],matrix_padded[:,None,:,:])
+    out = np.einsum('ijkl,ijkl->ijk',y[None,:,None,:],x_padded[:,None,:,:])
     if normed:
-        norm_x = np.einsum('ijk,ijk->ij',matrix[:,None,:],matrix[:,None,:])
-        norm = np.sqrt(norm_x*norm_x.T)+np.finfo(matrix.dtype).eps
+        norm_x = np.einsum('ijk,ijk->ij',x[:,None,:],x[:,None,:])
+        norm_y = np.einsum('ijk,ijk->ij',y[:,None,:],y[:,None,:])
+        norm = np.sqrt(norm_x*norm_y.T)+np.finfo(x.dtype).eps
         out = np.true_divide(out,norm[...,None])
 
     # Use valid mask to skip columns and have the final output
