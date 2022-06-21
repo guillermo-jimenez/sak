@@ -275,7 +275,7 @@ def zero_crossing_areas(X: np.ndarray, axis: int = None, normalize: bool = False
     return areas
 
 
-def xcorr(x: np.ndarray, y: np.ndarray = None, normed: bool = True, maxlags: int = None, elementwise: bool = True) -> Tuple[np.ndarray, np.ndarray]:
+def xcorr(x: np.ndarray, y: np.ndarray = None, normed: bool = True, maxlags: int = None) -> Tuple[np.ndarray, np.ndarray]:
     """Cross correlation of two signals of equal length
     Returns the coefficients when normed=True and inner products when normed=False
 
